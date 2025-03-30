@@ -1,9 +1,12 @@
 use anyhow::Result;
 use api::{rate_limiter::RateLimiter, schema::Upload};
-use base64::{Engine as _, engine::general_purpose};
-use reqwest::{header::{self, HeaderValue, USER_AGENT}, Response};
+use base64::{engine::general_purpose, Engine as _};
+use reqwest::{
+    header::{self, HeaderValue, USER_AGENT},
+    Response,
+};
 use std::{collections::HashMap, fs::File, io::Write};
-use tracing::{info, debug};
+use tracing::{debug, error, info};
 
 mod api;
 
@@ -29,7 +32,7 @@ async fn main() -> Result<()> {
         .default_headers(headers.clone());
     let api_client = api_client_builder.build()?;
 
-    let rate_limiter = RateLimiter::new(tokio::time::Duration::from_secs(1),1);
+    let rate_limiter = RateLimiter::new(tokio::time::Duration::from_secs(1), 1);
 
     let url = format!("https://e621.net/favorites.json?page=1");
 
@@ -51,11 +54,12 @@ async fn main() -> Result<()> {
 
 #[tracing::instrument(skip_all)]
 async fn download_previews(posts: &Vec<Upload>, client: &reqwest::Client) -> Result<()> {
-    let rate_limiter = RateLimiter::new(tokio::time::Duration::from_secs(1),MAX_DOWNLOADS);
+    let rate_limiter = RateLimiter::new(tokio::time::Duration::from_secs(1), MAX_DOWNLOADS);
 
     for post in posts {
         rate_limiter.acquire().await;
         let path: String = post.preview.url.clone();
+        // TODO: check if file exists
         let mut download_to = File::create(format!("./cache/{}.jpg", post.id))?;
         info!("Downloading {} to ./cache/{}.jpg", path, post.id);
         download_to.write_all(&client.get(path).send().await?.bytes().await?)?;

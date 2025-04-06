@@ -7,11 +7,13 @@ edition = "2021"
 anyhow = "1.0.97"
 base64 = "0.22.1"
 chrono = { version = "0.4.40", features = ["serde", "std"] }
+config = "0.15.11"
 dotenvy = "0.15.7"
 governor = "0.9.0"
 iced = { version = "0.13.1", features = ["image"] }
+iced_aw = "0.12.2"
 json = "0.12.4"
-md5 = "0.7.0"
+md-5 = "0.10.6"
 reqwest = { version = "0.12.15", features = ["blocking", "json"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"

@@ -1,14 +1,21 @@
 use anyhow::Result;
 use api::{rate_limiter::RateLimiter, schema::Upload};
 use base64::{engine::general_purpose, Engine as _};
+use md5::{Digest, Md5};
 use reqwest::{
     header::{self, HeaderValue, USER_AGENT},
     Response,
 };
-use std::{collections::HashMap, fs::File, io::Write};
-use tracing::{debug, error, info};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{copy, Write},
+    path::PathBuf,
+};
+use tracing::{debug, info};
 
 mod api;
+mod gui;
 
 const MAX_DOWNLOADS: usize = 5;
 
@@ -49,6 +56,9 @@ async fn main() -> Result<()> {
 
     download_previews(favs, &api_client).await?;
 
+    iced::application(gui::MSGui::title, gui::MSGui::update, gui::MSGui::view)
+        .run_with(gui::MSGui::new)?;
+
     Ok(())
 }
 
@@ -57,10 +67,14 @@ async fn download_previews(posts: &Vec<Upload>, client: &reqwest::Client) -> Res
     let rate_limiter = RateLimiter::new(tokio::time::Duration::from_secs(1), MAX_DOWNLOADS);
 
     for post in posts {
-        rate_limiter.acquire().await;
         let path: String = post.preview.url.clone();
-        // TODO: check if file exists
-        let mut download_to = File::create(format!("./cache/{}.jpg", post.id))?;
+        let file_path: PathBuf = PathBuf::from(format!("./cache/{}.jpg", post.id));
+        if file_path.exists() {
+            info!("Already downloaded {}", post.id);
+            continue;
+        }
+        let mut download_to = File::create(file_path)?;
+        rate_limiter.acquire().await;
         info!("Downloading {} to ./cache/{}.jpg", path, post.id);
         download_to.write_all(&client.get(path).send().await?.bytes().await?)?;
     }

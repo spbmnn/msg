@@ -2,6 +2,7 @@ use iced::widget::{button, column, container, image, image::Handle, row, scrolla
 use iced::{Element, Length};
 use iced_gif::{Frames, Gif};
 use iced_video_player::VideoPlayer;
+use tracing::error;
 
 use crate::{
     app::Message,
@@ -11,8 +12,10 @@ use crate::{
     },
 };
 
-pub fn render_detail<'a>(post: &'a Post, store: &PostStore) -> Element<'a, Message> {
-    let mut media_panel = column![
+use super::video_player::VideoPlayerWidget;
+
+pub fn render_detail<'a>(post: &'a Post, store: &PostStore, video_player: Option<&'a VideoPlayerWidget>) -> Element<'a, Message> {
+    let media_panel = column![
         button("back").on_press(Message::BackToGrid),
         text(format!("post #{}", post.id)),
         text(match post.rating {
@@ -21,33 +24,49 @@ pub fn render_detail<'a>(post: &'a Post, store: &PostStore) -> Element<'a, Messa
             Rating::Explicit => "Rating: Explicit",
         }),
         text(format!("score: {}", post.score.total)),
+        render_media(post, store, video_player)
     ];
-
-    match post.file.ext.as_deref() {
-        Some("gif") => {
-            if let Some(data) = store.get_gif(post.id) {
-                media_panel = media_panel.push(text("gif dont work yet oops"));
-                //let frames = Frames::from_bytes(*data).clone().unwrap();
-                //col = col.push(Gif::new(&frames));
-            }
-        }
-        Some("webm") | Some("mp4") => {
-            if let Some(url) = store.get_video(post.id) {
-                media_panel = media_panel.push(text("video dont work yet oops"));
-            }
-        }
-        _ => {
-            if let Some(img) = store.get_image(post.id) {
-                // MUST FIX: currently panics if image too large
-                media_panel = media_panel.push(image(img.clone()));
-            }
-        }
-    }
 
     let info_panel = info_panel(&post);
 
     row![media_panel, info_panel].into()
 }
+
+fn render_media<'a>(post: &Post, store: &PostStore, video_player: Option<&'a VideoPlayerWidget>) -> Element<'a, Message> {
+    // --- IMAGE POSTS ---
+    if let Some(img) = store.get_image(post.id) {
+        return container(
+            image(img.clone())
+                .width(Length::Shrink)
+                .height(Length::Shrink),
+        )
+        .padding(16)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into();
+    }
+
+    // --- GIF POSTS ---
+    if let Some(data) = store.get_gif(post.id) {
+        if let Ok(frames) = iced_gif::Frames::from_bytes(data.to_vec()) {
+            return Gif::new(Box::leak(Box::new(frames))).into(); // this is atrocious
+        }
+    }
+
+    // --- VIDEO POSTS ---
+    if let Some(_url) = store.get_video(post.id) {
+        if let Some(component) = video_player {
+            return component
+                .view()
+                .map(Message::VideoPlayerMsg);
+        } else {
+            return text("[video component not initialized]").into();
+        }
+    }
+
+    return text("[media unavailable]").into();
+}
+
 
 fn info_panel<'a>(post: &'a Post) -> Element<'a, Message> {
     let mut panel = column![];

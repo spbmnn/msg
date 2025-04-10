@@ -18,15 +18,15 @@ use crate::core::model::Post;
 use crate::core::store::PostStore;
 use crate::gui::detail_view::render_detail;
 use crate::gui::post_tile::grid_view;
+use crate::gui::video_player::{VideoPlayerMessage, VideoPlayerWidget};
 
-#[derive(Debug)]
 pub enum Msg {
     Loading,
     Loaded(State),
 }
 
-#[derive(Debug)]
 pub struct State {
+    pub video_player: Option<VideoPlayerWidget>,
     pub config: Config,
     pub posts: Vec<Post>,
     pub store: PostStore,
@@ -50,7 +50,7 @@ pub enum Message {
     SearchSubmitted,
     BackToGrid,
     Tick,
-    EventOccurred(Event),
+    VideoPlayerMsg(VideoPlayerMessage),
     Exit,
 }
 
@@ -203,15 +203,16 @@ impl Msg {
                     Message::BackToGrid => {
                         state.selected_post = None;
                     }
-                    Message::EventOccurred(event) => {
-                        if let Event::Window(window::Event::CloseRequested) = event {
-                            info!("exiting...");
+                    Message::Exit => {
+                        info!("exiting...");
 
-                            Config::save(&state.config);
+                        Config::save(&state.config);
 
-                            return window::get_latest().and_then(window::close);
-                        } else {
-                            return Task::none();
+                        return window::get_latest().and_then(window::close);
+                    }
+                    Message::VideoPlayerMsg(msg) => {
+                        if let Some(player) = &mut state.video_player {
+                            return player.update(msg);
                         }
                     }
                     _ => {}
@@ -228,7 +229,7 @@ impl Msg {
                 if let Some(selected_id) = state.selected_post {
                     // --- Detail view ---
                     if let Some(post) = state.store.get_post(selected_id) {
-                        return render_detail(&post, &state.store);
+                        return render_detail(&post, &state.store, state.video_player.as_ref());
                     }
                 }
 
@@ -263,13 +264,16 @@ impl Msg {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        event::listen().map(Message::EventOccurred)
+        event::listen_with(|event, _, _| match event {
+            Event::Window(window::Event::CloseRequested) => Some(Message::Exit),
+            _ => None
+        })
     }
 
     pub fn new() -> (Self, Task<Message>) {
         debug!("creating new Msg");
 
-        let mut app = Self::Loaded(State {
+        let app = Self::Loaded(State {
             config: Config::new(),
             current_tag: "fwankie".into(),
             ..Default::default()
@@ -297,10 +301,8 @@ impl Msg {
 impl Default for State {
     fn default() -> Self {
         State {
-            config: Config {
-                username: None,
-                api_key: None,
-            },
+            video_player: None,
+            config: Config::default(),
             posts: vec![],
             store: PostStore::new(),
             current_tag: String::new(),

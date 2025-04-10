@@ -63,6 +63,22 @@ pub struct Tags {
     pub lore: Vec<String>,
 }
 
+impl Tags {
+    pub fn iter(&self) -> impl Iterator<Item = (&'static str, &Vec<String>)> {
+        [
+            ("general", &self.general),
+            ("artist", &self.artist),
+            ("copyright", &self.copyright),
+            ("character", &self.character),
+            ("species", &self.species),
+            ("invalid", &self.invalid),
+            ("meta", &self.meta),
+            ("lore", &self.lore),
+        ]
+        .into_iter()
+    }
+}
+
 /*#[derive(Serialize, Deserialize, Debug)]
 struct Relationships {
     parent_id: Option<u32>,

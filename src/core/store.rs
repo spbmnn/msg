@@ -111,10 +111,3 @@ impl PostStore {
         self.videos.contains_key(&id)
     }
 }
-
-fn cache_path() -> Option<PathBuf> {
-    match ProjectDirs::from("xyz", "stripywalrus", "msg") {
-        Some(path) => Some(path.cache_dir().to_path_buf()),
-        None => None,
-    }
-}

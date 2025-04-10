@@ -1,16 +1,17 @@
 use iced::Length::Fill;
-use iced::Task;
+use iced::{event, window, Event, Size, Subscription, Task};
 use iced::{
-    widget::{column, scrollable, text},
+    widget::{button, column, row, scrollable, text, text_input},
     Element,
 };
 use iced_gif::{Frames, Gif};
 use iced_video_player::Video;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use iced::widget::image::Handle;
 use url::Url;
 
+use crate::core::api::fetch_posts;
 use crate::core::config::Config;
 use crate::core::media::{fetch_gif, fetch_image, fetch_preview, fetch_video, MediaError};
 use crate::core::model::Post;
@@ -32,6 +33,7 @@ pub struct State {
     pub current_tag: String,
     pub selected_post: Option<u32>,
     pub loading: bool,
+    pub search_input: String,
 }
 
 #[derive(Debug, Clone)]
@@ -44,8 +46,12 @@ pub enum Message {
     GifLoaded(u32, Vec<u8>),
     VideoLoaded(u32, Url),
     ViewPost(u32),
+    SearchInputChanged(String),
+    SearchSubmitted,
     BackToGrid,
     Tick,
+    EventOccurred(Event),
+    Exit,
 }
 
 impl Msg {
@@ -91,16 +97,15 @@ impl Msg {
                                 let post_id = post.id;
                                 let url = url.clone();
 
-                                tasks.push(Task::perform(
-                                    fetch_preview(url),
-                                    move |res| match res {
+                                tasks.push(Task::perform(fetch_preview(post_id, url), move |res| {
+                                    match res {
                                         Ok(image) => Message::ThumbnailLoaded(post_id, image),
                                         Err(err) => {
                                             error!("thumbnail failed: {err}");
                                             Message::Tick
                                         }
-                                    },
-                                ))
+                                    }
+                                }))
                             }
                         }
 
@@ -108,6 +113,7 @@ impl Msg {
                     }
                     Message::ViewPost(id) => {
                         state.selected_post = Some(id);
+                        info!("selected post {id}");
 
                         let mut commands = vec![];
 
@@ -136,7 +142,7 @@ impl Msg {
                                             move |res| match res {
                                                 Ok(url) => Message::VideoLoaded(id, url),
                                                 Err(err) => {
-                                                    error!("gif failed: {err}");
+                                                    error!("video failed: {err}");
                                                     Message::Tick
                                                 }
                                             },
@@ -147,11 +153,11 @@ impl Msg {
                                     if !state.store.has_image(id) {
                                         let url = post.file.url.clone().unwrap();
                                         commands.push(Task::perform(
-                                            fetch_video(id, url, post.file.ext.clone().unwrap()),
+                                            fetch_image(id, url, post.file.ext.clone().unwrap()),
                                             move |res| match res {
-                                                Ok(url) => Message::VideoLoaded(id, url),
+                                                Ok(handle) => Message::ImageLoaded(id, handle),
                                                 Err(err) => {
-                                                    error!("gif failed: {err}");
+                                                    error!("image failed: {err}");
                                                     Message::Tick
                                                 }
                                             },
@@ -174,6 +180,40 @@ impl Msg {
                     Message::VideoLoaded(id, video) => {
                         state.store.insert_video(id, video);
                     }
+                    Message::SearchInputChanged(query) => {
+                        state.search_input = query;
+                        return Task::none();
+                    }
+                    Message::SearchSubmitted => {
+                        let query = state.search_input.trim().to_string();
+                        if !query.is_empty() {
+                            info!("submitting search for {query}");
+                            return Task::perform(
+                                fetch_posts(query.clone(), 1),
+                                move |res| match res {
+                                    Ok(posts) => Message::PostsLoaded(posts),
+                                    Err(err) => {
+                                        error!("{err}");
+                                        Message::Tick
+                                    }
+                                },
+                            );
+                        }
+                    }
+                    Message::BackToGrid => {
+                        state.selected_post = None;
+                    }
+                    Message::EventOccurred(event) => {
+                        if let Event::Window(window::Event::CloseRequested) = event {
+                            info!("exiting...");
+
+                            Config::save(&state.config);
+
+                            return window::get_latest().and_then(window::close);
+                        } else {
+                            return Task::none();
+                        }
+                    }
                     _ => {}
                 }
                 Task::none()
@@ -185,18 +225,28 @@ impl Msg {
         match self {
             Msg::Loading => text("loading").into(),
             Msg::Loaded(state) => {
-                debug!("viewing! {:?}", state);
                 if let Some(selected_id) = state.selected_post {
                     // --- Detail view ---
                     if let Some(post) = state.store.get_post(selected_id) {
-                        render_detail(&post, &state.store);
+                        return render_detail(&post, &state.store);
                     }
                 }
+
+                let search_bar = row![
+                    text_input("search tags...", &state.search_input)
+                        .on_input(Message::SearchInputChanged)
+                        .on_submit(Message::SearchSubmitted)
+                        .padding(8)
+                        .size(16),
+                    button("search")
+                        .on_press(Message::SearchSubmitted)
+                        .padding(8)
+                ]
+                .spacing(8);
 
                 let mut images: Vec<Option<&Handle>> = vec![];
 
                 for post in &state.posts {
-                    debug!("post found");
                     let thumb = state.store.get_thumbnail(post.id);
                     images.push(thumb);
                 }
@@ -204,12 +254,16 @@ impl Msg {
                 let content = if state.loading {
                     column![text("loading").size(16)]
                 } else {
-                    grid_view(&state.posts, images.as_slice(), 4).width(Fill)
+                    grid_view(&state.posts, images.as_slice(), 5).width(Fill)
                 };
 
-                scrollable(content.padding(16)).into()
+                column![search_bar, scrollable(content.padding(16))].into()
             }
         }
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        event::listen().map(Message::EventOccurred)
     }
 
     pub fn new() -> (Self, Task<Message>) {
@@ -250,6 +304,7 @@ impl Default for State {
             posts: vec![],
             store: PostStore::new(),
             current_tag: String::new(),
+            search_input: String::new(),
             selected_post: None,
             loading: false,
         }

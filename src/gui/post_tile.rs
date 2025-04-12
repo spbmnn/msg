@@ -1,5 +1,5 @@
 use iced::{
-    widget::{column, container, image, image::Handle, row, text, Button, Column},
+    widget::{button, column, container, image, image::Handle, row, text, Button, Column},
     Element, Length,
 };
 
@@ -59,8 +59,14 @@ pub fn grid_view<'a>(
             r = r.push(render(post, **img));
         }
 
-        grid = grid.push(r);
+        grid = grid.push(container(r).center_x(Length::Fill).width(Length::Fill));
     }
 
-    grid
+    grid = grid.push(
+        button("load more")
+            .on_press(Message::LoadMorePosts)
+            .padding(8),
+    );
+
+    grid.width(Length::Fill)
 }

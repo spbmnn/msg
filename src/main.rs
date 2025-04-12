@@ -1,5 +1,3 @@
-use anyhow::{Error, Result};
-
 mod app;
 mod core;
 mod gui;
@@ -21,11 +19,7 @@ fn init_tracing() {
     use tracing_subscriber::EnvFilter;
 
     tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::builder()
-                .with_default_directive(LevelFilter::INFO.into())
-                .from_env_lossy(),
-        )
+        .with_env_filter(EnvFilter::from_default_env())
         .with_target(true)
         .with_line_number(true)
         .init();

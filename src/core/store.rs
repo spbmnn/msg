@@ -4,6 +4,7 @@ use directories::ProjectDirs;
 use iced::widget::image::Handle;
 use iced_gif::Frames;
 use iced_video_player::Video;
+use tracing::{debug, trace};
 use url::Url;
 
 use super::model::Post;
@@ -62,11 +63,20 @@ impl PostStore {
     // --- Images ---
 
     pub fn insert_image(&mut self, id: u32, handle: Handle) {
+        trace!(post_id = id, "Inserting image into store");
         self.images.insert(id, handle);
     }
 
     pub fn get_image(&self, id: u32) -> Option<&Handle> {
-        self.images.get(&id)
+        let result = self.images.get(&id);
+        trace!(
+            post_id = id,
+            found = result.is_some(),
+            "get_image: found? {}",
+            result.is_some()
+        );
+
+        result
     }
 
     // --- GIFs ---

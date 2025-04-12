@@ -14,7 +14,11 @@ use crate::{
 
 use super::video_player::VideoPlayerWidget;
 
-pub fn render_detail<'a>(post: &'a Post, store: &PostStore, video_player: Option<&'a VideoPlayerWidget>) -> Element<'a, Message> {
+pub fn render_detail<'a>(
+    post: &'a Post,
+    store: &PostStore,
+    video_player: Option<&'a VideoPlayerWidget>,
+) -> Element<'a, Message> {
     let media_panel = column![
         button("back").on_press(Message::BackToGrid),
         text(format!("post #{}", post.id)),
@@ -32,7 +36,11 @@ pub fn render_detail<'a>(post: &'a Post, store: &PostStore, video_player: Option
     row![media_panel, info_panel].into()
 }
 
-fn render_media<'a>(post: &Post, store: &PostStore, video_player: Option<&'a VideoPlayerWidget>) -> Element<'a, Message> {
+fn render_media<'a>(
+    post: &Post,
+    store: &PostStore,
+    video_player: Option<&'a VideoPlayerWidget>,
+) -> Element<'a, Message> {
     // --- IMAGE POSTS ---
     if let Some(img) = store.get_image(post.id) {
         return container(
@@ -56,9 +64,7 @@ fn render_media<'a>(post: &Post, store: &PostStore, video_player: Option<&'a Vid
     // --- VIDEO POSTS ---
     if let Some(_url) = store.get_video(post.id) {
         if let Some(component) = video_player {
-            return component
-                .view()
-                .map(Message::VideoPlayerMsg);
+            return component.view().map(Message::VideoPlayerMsg);
         } else {
             return text("[video component not initialized]").into();
         }
@@ -67,28 +73,39 @@ fn render_media<'a>(post: &Post, store: &PostStore, video_player: Option<&'a Vid
     return text("[media unavailable]").into();
 }
 
-
 fn info_panel<'a>(post: &'a Post) -> Element<'a, Message> {
     let mut panel = column![];
 
     for (category, tags) in post.tags.iter().filter(|(_, tags)| !tags.is_empty()) {
         let header = text(format!("{category}:")).size(16);
 
-        let tag_list = column(
-            tags.iter()
-                .map(|tag| {
-                    container(text(tag))
-                        .padding([4, 6])
-                        .style(container::bordered_box)
-                        .into()
-                })
-                .collect::<Vec<_>>(),
-        )
-        .spacing(8)
-        .width(Length::Fill);
+        let tag_list = column(tags.iter().map(|tag| render_tag(tag)).collect::<Vec<_>>())
+            .spacing(8)
+            .width(Length::Fill);
 
         panel = panel.push(header).push(tag_list).push(text(""));
     }
 
     scrollable(panel.spacing(10)).into()
+}
+
+fn render_tag(tag: &String) -> Element<'_, Message> {
+    row![
+        button("f")
+            .on_press(Message::FollowTag(tag.clone()))
+            .padding(4)
+            .width(24),
+        button("+")
+            .on_press(Message::AddTagToSearch(tag.clone()))
+            .padding(4)
+            .width(24),
+        button("-")
+            .on_press(Message::NegateTagFromSearch(tag.clone()))
+            .padding(4)
+            .width(24),
+        button(text(tag))
+            .on_press(Message::LoadPosts(tag.clone()))
+            .padding(4),
+    ]
+    .into()
 }

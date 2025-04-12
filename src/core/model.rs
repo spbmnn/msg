@@ -5,7 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::fmt::{self, Display};
 
 /// Represents a post on e621.
 #[derive(Clone, Serialize, Deserialize)]
@@ -66,11 +66,11 @@ pub struct Tags {
 impl Tags {
     pub fn iter(&self) -> impl Iterator<Item = (&'static str, &Vec<String>)> {
         [
-            ("general", &self.general),
             ("artist", &self.artist),
             ("copyright", &self.copyright),
             ("character", &self.character),
             ("species", &self.species),
+            ("general", &self.general),
             ("invalid", &self.invalid),
             ("meta", &self.meta),
             ("lore", &self.lore),
@@ -79,13 +79,18 @@ impl Tags {
     }
 }
 
-/*#[derive(Serialize, Deserialize, Debug)]
-struct Relationships {
-    parent_id: Option<u32>,
-    has_children: bool,
-    has_active_children: bool,
-    children: Vec<u32>,
-}*/
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FollowedTag {
+    pub tag: String,
+    #[serde(default)]
+    pub last_seen_post_id: Option<u32>,
+}
+
+impl fmt::Display for FollowedTag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.tag)
+    }
+}
 
 impl fmt::Display for Post {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

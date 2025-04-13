@@ -1,12 +1,16 @@
 use std::time::Duration;
 
-use iced::{widget::{button, row, column, text, Slider}, Task, Element, Length};
+use iced::{
+    widget::{button, column, row, text, Slider},
+    Element, Length, Task,
+};
 use iced_video_player::{Video, VideoPlayer};
-use url::Url;
 use tracing::trace;
+use url::Url;
 
 use crate::app::Message;
 
+#[derive(Debug)]
 pub struct VideoPlayerWidget {
     pub video: Video,
     pub position: f64,
@@ -20,7 +24,7 @@ pub enum VideoPlayerMessage {
     Seek(f64),
     SeekRelease,
     EndOfStream,
-    NewFrame
+    NewFrame,
 }
 
 impl VideoPlayerWidget {
@@ -28,10 +32,9 @@ impl VideoPlayerWidget {
         VideoPlayerWidget {
             video: video,
             position: 0.0,
-            dragging_cursor: false
+            dragging_cursor: false,
         }
     }
-
 
     pub fn update(&mut self, message: VideoPlayerMessage) -> Task<Message> {
         match message {
@@ -66,21 +69,18 @@ impl VideoPlayerWidget {
     }
 
     pub fn view(&self) -> Element<'_, VideoPlayerMessage> {
-        let controls = row![ // TODO: add loop controls/progress bar, slider
+        let controls = row![
+            // TODO: add loop controls/progress bar, slider
             button(if self.video.paused() {
                 "⏵︎"
             } else {
                 "⏸︎"
             })
             .on_press(VideoPlayerMessage::TogglePause),
-
         ];
 
-        column![
-            VideoPlayer::new(&self.video),
-            controls
-        ]
-        .spacing(12)
-        .into()
+        column![VideoPlayer::new(&self.video), controls]
+            .spacing(12)
+            .into()
     }
 }

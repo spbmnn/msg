@@ -1,6 +1,10 @@
-use crate::app::model::Post;
-use crate::app::api::ApiError;
+use iced::widget::image::Handle;
+use iced::widget::text_editor::Action;
+use url::Url;
+
 use crate::core::config::Config;
+use crate::core::model::Post;
+use crate::gui::video_player::VideoPlayerMessage;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -55,7 +59,7 @@ pub enum Message {
 /// Messages to manage startup state
 #[derive(Debug, Clone)]
 pub enum StartupMessage {
-    Loaded(Config)
+    Loaded(Config),
 }
 
 /// Messages to manage the search state
@@ -71,15 +75,13 @@ pub enum SearchMessage {
 /// Manages post loading
 #[derive(Debug, Clone)]
 pub enum PostMessage {
-    Load(String),
-    Loaded(Vec<Post>),
-    ThumbnailLoaded(u32, Handle),
-    View(u32)
+    View(u32),
 }
 
 /// Messages to manage media display.
 #[derive(Debug, Clone)]
 pub enum MediaMessage {
+    ThumbnailLoaded(u32, Handle),
     ImageLoaded(u32, Handle),
     GifLoaded(u32, Vec<u8>),
     VideoLoaded(u32, Url),
@@ -91,6 +93,7 @@ pub enum MediaMessage {
 pub enum DetailMessage {
     AddTagToSearch(String),
     NegateTagFromSearch(String),
+    BackToGrid,
 }
 
 /// Messages to manage settings menu state.
@@ -105,15 +108,16 @@ pub enum SettingsMessage {
 /// Messages to manage followed tags.
 #[derive(Debug, Clone)]
 pub enum FollowedMessage {
-    NewTagAdded(String),
+    CheckUpdates,
+    UpdatesReceived(Vec<(String, Vec<Post>)>),
     AddTag,
+    FollowTag(String),
     RemoveTag(String),
-    UpdatesReceived(Result<Vec<String, Vec<Post>, ApiError)
 }
 
 /// Messages to manage view states (settings, followed, etc.)
 #[derive(Debug, Clone)]
 pub enum ViewMessage {
     ToggleSettings,
-    WindowResized(u32),
+    WindowResized(u32, u32),
 }

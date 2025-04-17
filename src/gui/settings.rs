@@ -5,7 +5,13 @@ use iced::{
     Element, Length,
 };
 
-use crate::{app::Message, core::model::FollowedTag};
+use crate::{
+    app::{
+        message::{FollowedMessage, SettingsMessage},
+        Message,
+    },
+    core::model::FollowedTag,
+};
 
 use super::blacklist_editor::BlacklistEditor;
 
@@ -16,15 +22,16 @@ pub fn render_settings<'a>(
     followed_tags: &'a Vec<FollowedTag>,
     new_followed_tag: &'a str,
 ) -> Element<'a, Message> {
-    let username_input = text_input("username", username).on_input(Message::UsernameChanged);
+    let username_input = text_input("username", username)
+        .on_input(|user| Message::Settings(SettingsMessage::UsernameChanged(user)));
     let api_key_input = text_input("api key", api_key)
-        .on_input(Message::ApiKeyChanged)
+        .on_input(|key| Message::Settings(SettingsMessage::ApiKeyChanged(key)))
         .secure(true);
     let blacklist_editor = text_editor(blacklist_content)
-        .on_action(Message::BlacklistEdited)
+        .on_action(|bl| Message::Settings(SettingsMessage::BlacklistEdited(bl)))
         .height(300);
 
-    let save_button = button("save").on_press(Message::SaveSettings);
+    let save_button = button("save").on_press(Message::Settings(SettingsMessage::Save));
 
     column![
         text("e621 login").size(20),
@@ -44,14 +51,16 @@ fn followed_tag_settings<'a>(
     new_followed_tag: &'a str,
 ) -> Element<'a, Message> {
     let followed_tag_input = text_input("new tag", new_followed_tag)
-        .on_input(Message::NewFollowedTagChanged)
-        .on_submit(Message::AddFollowedTag)
+        .on_input(|field| Message::Settings(SettingsMessage::FollowFieldChanged(field)))
+        .on_submit(Message::Followed(FollowedMessage::AddTag))
         .width(Length::Fill);
 
     let tag_buttons = row(followed_tags.iter().map(|tag| {
         row![
             text(tag.to_string()),
-            button("✕").on_press(Message::RemoveFollowedTag(tag.to_string()))
+            button("✕").on_press(Message::Followed(FollowedMessage::RemoveTag(
+                tag.to_string()
+            )))
         ]
         .spacing(4)
         .padding(6)

@@ -4,7 +4,10 @@ use iced::{
 };
 
 use crate::{
-    app::Message,
+    app::{
+        message::{PostMessage, SearchMessage},
+        Message,
+    },
     core::model::{Post, Rating},
 };
 
@@ -39,7 +42,7 @@ pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>) -> Element<'a, Messag
     let layout = column![preview, meta].spacing(4).padding(8);
 
     Button::new(layout)
-        .on_press(Message::ViewPost(post.id))
+        .on_press(Message::Post(PostMessage::View(post.id)))
         .width(Length::Shrink)
         .padding(4)
         .into()
@@ -64,7 +67,7 @@ pub fn grid_view<'a>(
 
     grid = grid.push(
         button("load more")
-            .on_press(Message::LoadMorePosts)
+            .on_press(Message::Search(SearchMessage::LoadMorePosts))
             .padding(8),
     );
 

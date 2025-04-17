@@ -1,18 +1,23 @@
 mod app;
 mod core;
 mod gui;
+mod util;
 
-use app::Msg;
-use tracing::{info, level_filters::LevelFilter};
+use app::App;
+use tracing::{error, info, level_filters::LevelFilter};
 
 fn main() -> iced::Result {
     init_tracing();
-    info!("initialized");
+    info!("logging initialized");
+    if let Err(e) = util::gstreamer_check::verify_gstreamer_plugins() {
+        error!("GStreamer check failed: {e}");
+        std::process::exit(1);
+    }
 
-    iced::application(Msg::title, Msg::update, Msg::view)
+    iced::application("MSG", app::update, app::view)
         .exit_on_close_request(false)
-        .subscription(Msg::subscription)
-        .run_with(Msg::new)
+        .subscription(app::subscription)
+        .run_with(App::new)
 }
 
 fn init_tracing() {

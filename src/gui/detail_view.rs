@@ -5,6 +5,7 @@ use iced_video_player::VideoPlayer;
 use tracing::error;
 
 use crate::{
+    app::message::{DetailMessage, FollowedMessage, MediaMessage, SearchMessage, ViewMessage},
     app::Message,
     core::{
         model::{Post, Rating},
@@ -12,15 +13,15 @@ use crate::{
     },
 };
 
-use super::video_player::VideoPlayerWidget;
+use super::video_player::{VideoPlayerMessage, VideoPlayerWidget};
 
 pub fn render_detail<'a>(
     post: &'a Post,
     store: &PostStore,
-    video_player: Option<&'a VideoPlayerWidget>,
+    video_player: &'a Option<VideoPlayerWidget>,
 ) -> Element<'a, Message> {
     let media_panel = column![
-        button("back").on_press(Message::BackToGrid),
+        button("back").on_press(Message::View(ViewMessage::ShowGrid)),
         text(format!("post #{}", post.id)),
         text(match post.rating {
             Rating::Safe => "Rating: Safe",
@@ -39,7 +40,7 @@ pub fn render_detail<'a>(
 fn render_media<'a>(
     post: &Post,
     store: &PostStore,
-    video_player: Option<&'a VideoPlayerWidget>,
+    video_player: &'a Option<VideoPlayerWidget>,
 ) -> Element<'a, Message> {
     // --- IMAGE POSTS ---
     if let Some(img) = store.get_image(post.id) {
@@ -64,7 +65,9 @@ fn render_media<'a>(
     // --- VIDEO POSTS ---
     if let Some(_url) = store.get_video(post.id) {
         if let Some(component) = video_player {
-            return component.view().map(Message::VideoPlayerMsg);
+            return component
+                .view()
+                .map(|msg| Message::Media(MediaMessage::VideoPlayerMsg(msg)));
         } else {
             return text("[video component not initialized]").into();
         }
@@ -92,19 +95,21 @@ fn info_panel<'a>(post: &'a Post) -> Element<'a, Message> {
 fn render_tag(tag: &String) -> Element<'_, Message> {
     row![
         button("f")
-            .on_press(Message::FollowTag(tag.clone()))
+            .on_press(Message::Followed(FollowedMessage::FollowTag(tag.clone())))
             .padding(4)
             .width(24),
         button("+")
-            .on_press(Message::AddTagToSearch(tag.clone()))
+            .on_press(Message::Detail(DetailMessage::AddTagToSearch(tag.clone())))
             .padding(4)
             .width(24),
         button("-")
-            .on_press(Message::NegateTagFromSearch(tag.clone()))
+            .on_press(Message::Detail(DetailMessage::NegateTagFromSearch(
+                tag.clone()
+            )))
             .padding(4)
             .width(24),
         button(text(tag))
-            .on_press(Message::LoadPosts(tag.clone()))
+            .on_press(Message::Search(SearchMessage::LoadPosts(tag.clone())))
             .padding(4),
     ]
     .into()

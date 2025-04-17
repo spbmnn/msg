@@ -1,3 +1,4 @@
+use std::fmt;
 use std::time::Duration;
 
 use iced::{
@@ -10,11 +11,20 @@ use url::Url;
 
 use crate::app::Message;
 
-#[derive(Debug)]
 pub struct VideoPlayerWidget {
     pub video: Video,
     pub position: f64,
     pub dragging_cursor: bool,
+}
+
+impl fmt::Debug for VideoPlayerWidget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("VideoPlayerWidget")
+            .field("video", &"[Video omitted]")
+            .field("position", &self.position)
+            .field("dragging_cursor", &self.dragging_cursor)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone)]

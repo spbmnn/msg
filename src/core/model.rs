@@ -103,3 +103,22 @@ impl fmt::Debug for Post {
         write!(f, "post #{}", self.id)
     }
 }
+
+pub enum PostType {
+    Image,
+    Gif,
+    Video,
+    Flash,
+}
+
+impl Post {
+    pub fn get_type(&self) -> Option<PostType> {
+        match self.file.ext.as_deref() {
+            Some("gif") => Some(PostType::Gif),
+            Some("webm") | Some("mp4") => Some(PostType::Video),
+            Some("swf") => Some(PostType::Flash),
+            Some(_) => Some(PostType::Image),
+            None => None,
+        }
+    }
+}

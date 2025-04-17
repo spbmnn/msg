@@ -22,40 +22,6 @@ pub enum Message {
     Exit,
 }
 
-/*#[derive(Debug, Clone)]
-pub enum Message {
-    // --- Startup ---
-    Loaded(Config),
-    LoadPosts(String),
-
-    // --- Grid view ---
-    LoadMorePosts,
-    PostsLoaded(Vec<Post>),
-    ThumbnailLoaded(u32, Handle),
-    SearchInputChanged(String),
-    SearchSubmitted,
-
-    // --- Media ---
-    ImageLoaded(u32, Handle),
-    GifLoaded(u32, Vec<u8>),
-    VideoLoaded(u32, Url),
-    VideoPlayerMsg(VideoPlayerMessage),
-
-    // --- Detail view ---
-    ViewPost(u32),
-    BackToGrid,
-    AddTagToSearch(String),
-    NegateTagFromSearch(String),
-
-    // --- Tag Following ---
-    CheckFollowedUpdates,
-    FollowedUpdatesReceived(Vec<(String, Vec<Post>)>),
-    FollowTag(String),
-    NewFollowedTagChanged(String),
-    AddFollowedTag,
-    RemoveFollowedTag(String),
-}*/
-
 /// Messages to manage startup state
 #[derive(Debug, Clone)]
 pub enum StartupMessage {
@@ -68,8 +34,8 @@ pub enum SearchMessage {
     LoadPosts(String),
     LoadMorePosts,
     PostsLoaded(Vec<Post>),
-    SearchInputChanged(String),
-    SearchSubmitted,
+    InputChanged(String),
+    Submitted,
 }
 
 /// Manages post loading
@@ -93,7 +59,6 @@ pub enum MediaMessage {
 pub enum DetailMessage {
     AddTagToSearch(String),
     NegateTagFromSearch(String),
-    BackToGrid,
 }
 
 /// Messages to manage settings menu state.
@@ -102,6 +67,7 @@ pub enum SettingsMessage {
     UsernameChanged(String),
     ApiKeyChanged(String),
     BlacklistEdited(Action),
+    FollowFieldChanged(String),
     Save,
 }
 
@@ -118,6 +84,7 @@ pub enum FollowedMessage {
 /// Messages to manage view states (settings, followed, etc.)
 #[derive(Debug, Clone)]
 pub enum ViewMessage {
-    ToggleSettings,
+    ShowSettings,
+    ShowGrid,
     WindowResized(u32, u32),
 }

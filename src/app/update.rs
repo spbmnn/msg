@@ -2,13 +2,16 @@ use crate::app::message::{
     DetailMessage, FollowedMessage, MediaMessage, Message, PostMessage, SearchMessage,
     SettingsMessage, StartupMessage, ViewMessage,
 };
-use crate::app::state::App;
+use crate::app::state::{App, ViewMode};
 use crate::core::api::fetch_posts;
 use crate::core::blacklist;
-use crate::core::config::Auth;
+use crate::core::config::{Auth, Config};
+use crate::core::media::fetch_preview;
 use crate::core::media::{fetch_gif, fetch_image, fetch_video};
-use crate::core::model::{FollowedTag, Post};
-use iced::Task;
+use crate::core::model::{FollowedTag, Post, PostType};
+use crate::gui::video_player::VideoPlayerWidget;
+use iced::{window, Task};
+use iced_video_player::Video;
 use tracing::{debug, error, info, warn};
 
 pub fn update(app: &mut App, message: Message) -> Task<Message> {
@@ -21,8 +24,8 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
         Message::Settings(msg) => update_settings(app, msg),
         Message::Followed(msg) => update_followed(app, msg),
         Message::View(msg) => update_view(app, msg),
-        Message::Tick => Task::none(),
-        Message::Exit => Task::none(),
+        Message::Tick => tick(app),
+        Message::Exit => exit(app),
     }
 }
 
@@ -40,7 +43,7 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             return Task::perform(
                 crate::core::api::fetch_posts(query.clone(), None, app.config.auth.clone()),
                 move |res| match res {
-                    Ok(posts) => Message::Post(PostMessage::Loaded(posts)),
+                    Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
                     Err(err) => {
                         error!("Error fetching posts: {err}");
                         Message::Tick
@@ -55,7 +58,7 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             return Task::perform(
                 crate::core::api::fetch_posts(query.clone(), before_id, app.config.auth.clone()),
                 move |res| match res {
-                    Ok(posts) => Message::Post(PostMessage::Loaded(posts)),
+                    Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
                     Err(err) => {
                         error!("Error fetching posts: {err}");
                         Message::Tick
@@ -82,10 +85,10 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
                 }
             }
         }
-        SearchMessage::SearchInputChanged(text) => {
+        SearchMessage::InputChanged(text) => {
             app.search.input = text;
         }
-        SearchMessage::SearchSubmitted => {
+        SearchMessage::Submitted => {
             app.posts.clear();
             let query = app.search.input.trim().to_string();
             app.search.query = query.clone();
@@ -110,6 +113,7 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
 fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
     match msg {
         PostMessage::View(id) => {
+            app.ui.view_mode = ViewMode::Detail(id);
             app.selected_post = Some(id);
             info!("Selected post {id}");
 
@@ -184,7 +188,10 @@ fn update_media(app: &mut App, msg: MediaMessage) -> Task<Message> {
         MediaMessage::ThumbnailLoaded(id, handle) => app.store.insert_thumbnail(id, handle),
         MediaMessage::ImageLoaded(id, handle) => app.store.insert_image(id, handle),
         MediaMessage::GifLoaded(id, gif) => app.store.insert_gif(id, gif),
-        MediaMessage::VideoLoaded(id, url) => app.store.insert_video(id, url),
+        MediaMessage::VideoLoaded(id, url) => {
+            app.store.insert_video(id, url.clone());
+            app.video_player = Some(VideoPlayerWidget::new(Video::new(&url).unwrap()));
+        }
         MediaMessage::VideoPlayerMsg(message) => {
             if let Some(player) = &mut app.video_player {
                 return player.update(message);
@@ -214,7 +221,7 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
                     }
                     Err(err) => {
                         error!("Couldn't load posts: {err}");
-                        Message::Detail(DetailMessage::BackToGrid)
+                        Message::View(ViewMessage::ShowGrid)
                     }
                 },
             );
@@ -237,16 +244,12 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
                     }
                     Err(err) => {
                         error!("Couldn't load posts: {err}");
-                        Message::Detail(DetailMessage::BackToGrid)
+                        Message::View(ViewMessage::ShowGrid)
                     }
                 },
             );
         }
-        DetailMessage::BackToGrid => {
-            app.selected_post = None;
-        }
     }
-    Task::none()
 }
 
 fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
@@ -259,6 +262,9 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
         }
         SettingsMessage::BlacklistEdited(action) => {
             app.settings.blacklist_content.perform(action);
+        }
+        SettingsMessage::FollowFieldChanged(field) => {
+            app.followed.new_followed_tag = field;
         }
         SettingsMessage::Save => {
             debug!("Saving settings.");
@@ -284,7 +290,7 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
                 warn!("Faled to save config: {err}");
             }
 
-            app.ui.show_settings = false;
+            app.ui.view_mode = ViewMode::Grid;
         }
     }
     Task::none()
@@ -320,8 +326,12 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
 
 fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
     match msg {
-        ViewMessage::ToggleSettings => {
-            app.ui.show_settings = !app.ui.show_settings;
+        ViewMessage::ShowSettings => {
+            app.ui.view_mode = ViewMode::Settings;
+        }
+        ViewMessage::ShowGrid => {
+            app.selected_post = None;
+            app.ui.view_mode = ViewMode::Grid;
         }
         ViewMessage::WindowResized(width, height) => {
             app.ui.window_width = width;
@@ -329,4 +339,34 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
         }
     }
     Task::none()
+}
+
+fn tick(app: &mut App) -> Task<Message> {
+    if let Some(post_id) = app.search.thumbnail_queue.pop_front() {
+        if let Some(post) = app.posts.iter().find(|p| p.id == post_id) {
+            if let Some(url) = &post.preview.url {
+                return Task::perform(fetch_preview(post_id, url.clone()), move |res| match res {
+                    Ok(thumb) => Message::Media(MediaMessage::ThumbnailLoaded(post_id, thumb)),
+                    Err(err) => {
+                        error!("Failed to fetch thumbnail for {post_id}: {err}");
+                        Message::Tick
+                    }
+                });
+            }
+        }
+    }
+    Task::none()
+}
+
+fn exit(app: &mut App) -> Task<Message> {
+    info!("exiting...");
+
+    match &app.config.save() {
+        Ok(()) => (),
+        Err(err) => {
+            error!("Couldn't save config: {err}");
+        }
+    }
+
+    return window::get_latest().and_then(window::close);
 }

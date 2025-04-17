@@ -1,11 +1,16 @@
 use std::collections::VecDeque;
 
 use iced::widget::text_editor::Content;
+use iced::Task;
+use tracing::{debug, error};
 
+use crate::app::message::SearchMessage;
 use crate::core::config::Config;
 use crate::core::model::{FollowedTag, Post};
 use crate::core::store::PostStore;
 use crate::gui::video_player::VideoPlayerWidget;
+
+use super::Message;
 
 /// Values in settings fields
 #[derive(Debug)]
@@ -21,7 +26,7 @@ pub struct Settings {
 #[derive(Debug)]
 pub struct UiState {
     // Maybe replace this with an enum?
-    pub show_settings: bool,
+    pub view_mode: ViewMode,
     pub window_width: u32,
     pub window_height: u32,
 }
@@ -43,6 +48,13 @@ pub struct FollowedState {
     pub tags: Vec<FollowedTag>,
 }
 
+#[derive(Debug, Clone)]
+pub enum ViewMode {
+    Grid,
+    Detail(u32),
+    Settings,
+}
+
 #[derive(Debug)]
 pub struct App {
     pub settings: Settings,
@@ -61,4 +73,98 @@ pub struct App {
     pub loading: bool,
 
     pub video_player: Option<VideoPlayerWidget>,
+}
+
+impl App {
+    pub fn new() -> (Self, Task<Message>) {
+        debug!("creating new Msg");
+
+        let search = SearchState {
+            input: "fav:homogoat".into(),
+            query: "fav:homogoat".into(),
+            thumbnail_queue: VecDeque::new(),
+        };
+
+        let app = Self {
+            config: Config::new(),
+            search: search,
+            ..Default::default()
+        };
+
+        let cmd = Task::perform(
+            crate::core::api::fetch_posts(String::from("fav:homogoat"), None, None), // should fix
+            move |res| match res {
+                Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
+                Err(err) => {
+                    error!("getting posts failed: {err}");
+                    Message::Tick
+                }
+            },
+        );
+
+        (app, cmd)
+    }
+}
+
+impl Default for App {
+    fn default() -> Self {
+        let config: Config = match Config::load() {
+            Ok(config) => config,
+            Err(_) => Config::default(),
+        };
+        let (username, api_key) = match config.auth {
+            None => (String::new(), String::new()),
+            Some(ref auth) => (auth.username.clone(), auth.api_key.clone()),
+        };
+        let followed_tags = config.followed_tags.clone();
+        let blacklist = config.blacklist.rules.join("\n").clone();
+
+        Self {
+            settings: Settings {
+                username: username,
+                api_key: api_key,
+                blacklist_content: Content::with_text(&blacklist).into(),
+            },
+            ui: UiState {
+                view_mode: ViewMode::Grid,
+                window_width: 480,
+                window_height: 640,
+            },
+            search: SearchState {
+                input: String::new(),
+                query: String::new(),
+                thumbnail_queue: VecDeque::new(),
+            },
+            followed: FollowedState {
+                new_followed_tag: String::new(),
+                new_followed_posts: Vec::new(),
+                tags: followed_tags,
+            },
+            config: config,
+            store: PostStore::new(),
+            posts: Vec::new(),
+            selected_post: None,
+            loading: false,
+            video_player: None,
+            /*
+            video_player: None,
+            config: config,
+            posts: vec![],
+            followed_tags: followed_tags,
+            store: PostStore::new(),
+            current_tag: String::new(),
+            search_input: String::new(),
+            thumbnail_queue: VecDeque::new(),
+            new_followed_tag: String::new(),
+            new_followed_posts: Vec::new(),
+            selected_post: None,
+            loading: false,
+            show_settings: false,
+            settings_username: username,
+            settings_api_key: api_key,
+            blacklist_editor_content: Content::with_text(&blacklist).into(),
+            window_height: 480,
+            window_width: 640,*/
+        }
+    }
 }

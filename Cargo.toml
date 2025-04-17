@@ -9,6 +9,7 @@ anyhow = "1.0.97"
 base64 = "0.22.1"
 chrono = { version = "0.4.40", features = ["serde", "std"] }
 directories = "6.0.0"
+gstreamer = "0.23.5"
 iced = { version = "0.13.1", features = ["image", "tokio"] }
 iced_aw = "0.12.2"
 iced_gif = { version = "0.13.0", features = ["tokio"] }

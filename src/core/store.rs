@@ -1,21 +1,45 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufReader, BufWriter, Read, Write},
+    path::{Path, PathBuf},
+};
 
 use directories::ProjectDirs;
 use iced::widget::image::Handle;
 use iced_gif::Frames;
-use iced_video_player::Video;
+use rmp_serde::Serializer;
+use serde::Serialize;
+use thiserror::Error;
 use tracing::{debug, trace};
 use url::Url;
 
-use super::model::Post;
+use super::model::{Post, Vote};
+
+#[derive(Debug, Error)]
+pub enum StoreError {
+    #[error("IO error: {0}")]
+    IOError(#[from] std::io::Error),
+
+    #[error("RMP encoding error: {0}")]
+    RmpEncodeError(#[from] rmp_serde::encode::Error),
+
+    #[error("RMP decoding error: {0}")]
+    RmpDecodeError(#[from] rmp_serde::decode::Error),
+
+    #[error("Voting error: {0}")]
+    VoteError(String),
+}
 
 /// Stores media for posts.
 #[derive(Debug, Default)]
 pub struct PostStore {
     posts: HashMap<u32, Post>,
+    votes: HashMap<u32, Vote>,
     thumbnails: HashMap<u32, Handle>,
     images: HashMap<u32, Handle>,
     gifs: HashMap<u32, Vec<u8>>,
+    pub gif_frames: HashMap<u32, Frames>,
     videos: HashMap<u32, Url>,
 }
 
@@ -23,9 +47,11 @@ impl PostStore {
     pub fn new() -> Self {
         Self {
             posts: HashMap::new(),
+            votes: HashMap::new(),
             thumbnails: HashMap::new(),
             images: HashMap::new(),
             gifs: HashMap::new(),
+            gif_frames: HashMap::new(),
             videos: HashMap::new(),
         }
     }
@@ -48,6 +74,23 @@ impl PostStore {
 
     pub fn all_posts(&self) -> impl Iterator<Item = &Post> {
         self.posts.values()
+    }
+
+    // --- Votes ---
+
+    pub fn set_vote(&mut self, post_id: u32, vote: Option<Vote>) {
+        match vote {
+            Some(v) => {
+                self.votes.insert(post_id, v);
+            }
+            None => {
+                self.votes.remove(&post_id);
+            }
+        }
+    }
+
+    pub fn vote_for(&self, post_id: u32) -> Option<Vote> {
+        self.votes.get(&post_id).copied()
     }
 
     // --- Thumbnails ---
@@ -120,4 +163,25 @@ impl PostStore {
     pub fn has_video(&self, id: u32) -> bool {
         self.videos.contains_key(&id)
     }
+
+    pub fn save_votes_to(&self, path: &Path) -> Result<(), StoreError> {
+        let file = File::create(path)?;
+        let writer = BufWriter::new(file);
+
+        Ok(self.votes.serialize(&mut Serializer::new(writer))?)
+    }
+
+    pub fn load_votes_from(&mut self, path: &Path) -> Result<(), StoreError> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        self.votes = rmp_serde::decode::from_read(reader)?;
+        Ok(())
+    }
+}
+
+pub fn data_dir() -> PathBuf {
+    ProjectDirs::from("xyz", "stripywalrus", "msg")
+        .unwrap()
+        .data_dir()
+        .to_path_buf()
 }

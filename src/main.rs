@@ -3,12 +3,15 @@ mod core;
 mod gui;
 mod util;
 
+use gstreamer as gst;
+
 use app::App;
 use tracing::{error, info, level_filters::LevelFilter};
 
 fn main() -> iced::Result {
     init_tracing();
     info!("logging initialized");
+
     if let Err(e) = util::gstreamer_check::verify_gstreamer_plugins() {
         error!("GStreamer check failed: {e}");
         std::process::exit(1);

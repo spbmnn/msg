@@ -1,4 +1,5 @@
 use iced::widget::{button, column, container, image, image::Handle, row, scrollable, text};
+use iced::widget::{Column, Text};
 use iced::{Element, Length};
 use iced_gif::{Frames, Gif};
 use iced_video_player::VideoPlayer;
@@ -17,7 +18,7 @@ use super::video_player::{VideoPlayerMessage, VideoPlayerWidget};
 
 pub fn render_detail<'a>(
     post: &'a Post,
-    store: &PostStore,
+    store: &'a PostStore,
     video_player: &'a Option<VideoPlayerWidget>,
 ) -> Element<'a, Message> {
     let media_panel = column![
@@ -34,49 +35,52 @@ pub fn render_detail<'a>(
 
     let info_panel = info_panel(&post);
 
-    row![media_panel, info_panel].into()
+    row![
+        scrollable(media_panel.width(Length::FillPortion(9))),
+        scrollable(info_panel.width(Length::FillPortion(3)))
+    ]
+    .into()
 }
 
 fn render_media<'a>(
     post: &Post,
-    store: &PostStore,
+    store: &'a PostStore,
     video_player: &'a Option<VideoPlayerWidget>,
 ) -> Element<'a, Message> {
-    // --- IMAGE POSTS ---
-    if let Some(img) = store.get_image(post.id) {
-        return container(
-            image(img.clone())
-                .width(Length::Shrink)
-                .height(Length::Shrink),
-        )
-        .padding(16)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .into();
-    }
-
-    // --- GIF POSTS ---
-    if let Some(data) = store.get_gif(post.id) {
-        if let Ok(frames) = iced_gif::Frames::from_bytes(data.to_vec()) {
-            return Gif::new(Box::leak(Box::new(frames))).into(); // this is atrocious
+    match post.get_type() {
+        Some(crate::core::model::PostType::Image) => {
+            if let Some(img) = store.get_image(post.id) {
+                container(image(img).width(Length::Shrink).height(Length::Shrink))
+                    .padding(16)
+                    .into()
+            } else {
+                Text::new("Image not available").into()
+            }
         }
-    }
-
-    // --- VIDEO POSTS ---
-    if let Some(_url) = store.get_video(post.id) {
-        if let Some(component) = video_player {
-            return component
-                .view()
-                .map(|msg| Message::Media(MediaMessage::VideoPlayerMsg(msg)));
-        } else {
-            return text("[video component not initialized]").into();
+        Some(crate::core::model::PostType::Gif) => {
+            if let Some(_) = store.get_gif(post.id) {
+                match store.gif_frames.get(&post.id) {
+                    Some(frames) => Gif::new(frames).into(),
+                    None => Text::new("Failed to parse GIF").into(),
+                }
+            } else {
+                Text::new("GIF not available").into()
+            }
         }
+        Some(crate::core::model::PostType::Video) => {
+            if let Some(vp) = video_player {
+                vp.view()
+                    .map(|msg| Message::Media(MediaMessage::VideoPlayerMsg(msg)))
+                    .into()
+            } else {
+                Text::new("Cannot load video").into()
+            }
+        }
+        _ => Text::new("Unsupported type").into(),
     }
-
-    return text("[media unavailable]").into();
 }
 
-fn info_panel<'a>(post: &'a Post) -> Element<'a, Message> {
+fn info_panel<'a>(post: &'a Post) -> Column<'a, Message> {
     let mut panel = column![];
 
     for (category, tags) in post.tags.iter().filter(|(_, tags)| !tags.is_empty()) {
@@ -89,7 +93,7 @@ fn info_panel<'a>(post: &'a Post) -> Element<'a, Message> {
         panel = panel.push(header).push(tag_list).push(text(""));
     }
 
-    scrollable(panel.spacing(10)).into()
+    panel.spacing(10)
 }
 
 fn render_tag(tag: &String) -> Element<'_, Message> {

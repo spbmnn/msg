@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use reqwest::{Client, RequestBuilder};
+use reqwest::{Client, Method, RequestBuilder};
 
 use super::config::Auth;
 
@@ -17,6 +17,20 @@ pub static CLIENT: Lazy<Client> = Lazy::new(|| {
 
 pub fn get_authed(client: &Client, url: &str, auth: Option<&Auth>) -> RequestBuilder {
     let request = client.get(url);
+    if let Some(auth) = auth {
+        request.basic_auth(&auth.username, Some(&auth.api_key))
+    } else {
+        request
+    }
+}
+
+pub fn authed_request(
+    client: &Client,
+    method: Method,
+    url: &str,
+    auth: Option<&Auth>,
+) -> RequestBuilder {
+    let request = client.request(method, url);
     if let Some(auth) = auth {
         request.basic_auth(&auth.username, Some(&auth.api_key))
     } else {

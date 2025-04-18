@@ -3,16 +3,17 @@ use crate::app::message::{
     SettingsMessage, StartupMessage, ViewMessage,
 };
 use crate::app::state::{App, ViewMode};
-use crate::core::api::fetch_posts;
-use crate::core::blacklist;
+use crate::core::api::{fetch_posts, vote_post};
 use crate::core::config::{Auth, Config};
 use crate::core::media::fetch_preview;
 use crate::core::media::{fetch_gif, fetch_image, fetch_video};
 use crate::core::model::{FollowedTag, Post, PostType};
+use crate::core::store::data_dir;
+use crate::core::{blacklist, media};
 use crate::gui::video_player::VideoPlayerWidget;
 use iced::{window, Task};
 use iced_video_player::Video;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 pub fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
@@ -121,6 +122,8 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
             let mut commands = vec![];
 
             if let Some(post) = app.store.get_post(id) {
+                let file = &post.file.ext;
+                trace!("post file: {file:?}");
                 // TODO: Deal with .swfs for compatiblity.
                 // *Maaaaaaaybe* ruffle support? Doubt it.
                 match post.file.ext.as_deref() {
@@ -140,23 +143,21 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
                         }
                     }
                     Some("webm") | Some("mp4") => {
-                        if !app.store.has_video(id) {
-                            if !app.store.has_video(id) {
-                                let url = post.file.url.clone().unwrap();
-                                commands.push(Task::perform(
-                                    fetch_video(id, url, post.file.ext.clone().unwrap()),
-                                    move |res| match res {
-                                        Ok(url) => {
-                                            Message::Media(MediaMessage::VideoLoaded(id, url))
-                                        }
-                                        Err(err) => {
-                                            error!("Video {id} failed: {err}");
-                                            Message::Tick
-                                        }
-                                    },
-                                ));
-                            }
-                        }
+                        let url: String = if !app.store.has_video(id) {
+                            post.file.url.clone().unwrap()
+                        } else {
+                            app.store.get_video(id).unwrap().to_string()
+                        };
+                        commands.push(Task::perform(
+                            fetch_video(id, url, post.file.ext.clone().unwrap()),
+                            move |res| match res {
+                                Ok(url) => Message::Media(MediaMessage::VideoLoaded(id, url)),
+                                Err(err) => {
+                                    error!("Video {id} failed: {err}");
+                                    Message::Tick
+                                }
+                            },
+                        ));
                     }
                     Some("swf") => {}
                     _ => {
@@ -178,7 +179,22 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
                     }
                 }
             }
+
             return Task::batch(commands);
+        }
+        PostMessage::Vote(id, vote) => {
+            return Task::perform(
+                vote_post(id, vote, app.config.auth.unwrap()),
+                move |res| match res {
+                    Ok(v) => Message::Post(PostMessage::VoteResult(id, v)),
+                    Err(e) => Message::Tick,
+                },
+            );
+        }
+        PostMessage::Favorite(id) => {}
+        PostMessage::VoteResult(id, result) => {
+            app.store.set_vote(id, result);
+            Task::none()
         }
     }
 }
@@ -187,10 +203,28 @@ fn update_media(app: &mut App, msg: MediaMessage) -> Task<Message> {
     match msg {
         MediaMessage::ThumbnailLoaded(id, handle) => app.store.insert_thumbnail(id, handle),
         MediaMessage::ImageLoaded(id, handle) => app.store.insert_image(id, handle),
-        MediaMessage::GifLoaded(id, gif) => app.store.insert_gif(id, gif),
+        MediaMessage::GifLoaded(id, gif) => {
+            let frames = iced_gif::Frames::from_bytes(gif.clone());
+            if let Ok(f) = frames {
+                app.store.gif_frames.insert(id, f);
+            } else {
+                error!("Couldn't decode gif into frames");
+            }
+
+            app.store.insert_gif(id, gif);
+        }
         MediaMessage::VideoLoaded(id, url) => {
             app.store.insert_video(id, url.clone());
-            app.video_player = Some(VideoPlayerWidget::new(Video::new(&url).unwrap()));
+            match media::build_video_pipeline(url.as_str()) {
+                Ok(video) => {
+                    info!("Creating video player");
+                    app.video_player = Some(VideoPlayerWidget::new(video));
+                }
+                Err(err) => {
+                    error!("Failed to create video: {err}");
+                    app.video_player = None;
+                }
+            }
         }
         MediaMessage::VideoPlayerMsg(message) => {
             if let Some(player) = &mut app.video_player {
@@ -365,6 +399,14 @@ fn exit(app: &mut App) -> Task<Message> {
         Ok(()) => (),
         Err(err) => {
             error!("Couldn't save config: {err}");
+        }
+    }
+
+    let vote_path = data_dir().join("votes.mpk");
+    match app.store.save_votes_to(&vote_path) {
+        Ok(()) => (),
+        Err(err) => {
+            error!("Couldn't save votes: {err}");
         }
     }
 

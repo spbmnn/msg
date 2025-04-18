@@ -7,7 +7,7 @@ use tracing::{debug, error};
 use crate::app::message::SearchMessage;
 use crate::core::config::Config;
 use crate::core::model::{FollowedTag, Post};
-use crate::core::store::PostStore;
+use crate::core::store::{data_dir, PostStore};
 use crate::gui::video_player::VideoPlayerWidget;
 
 use super::Message;
@@ -119,6 +119,11 @@ impl Default for App {
         let followed_tags = config.followed_tags.clone();
         let blacklist = config.blacklist.rules.join("\n").clone();
 
+        let mut store = PostStore::new();
+
+        let vote_path = data_dir().join("votes.mpk");
+        store.load_votes_from(&vote_path).unwrap_or_default();
+
         Self {
             settings: Settings {
                 username: username,
@@ -141,7 +146,7 @@ impl Default for App {
                 tags: followed_tags,
             },
             config: config,
-            store: PostStore::new(),
+            store: store,
             posts: Vec::new(),
             selected_post: None,
             loading: false,

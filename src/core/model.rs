@@ -122,3 +122,9 @@ impl Post {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Vote {
+    Upvote = 1,
+    Downvote = -1,
+}

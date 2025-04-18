@@ -1,12 +1,15 @@
+use reqwest::Method;
 use serde::Deserialize;
 use thiserror::Error;
 use tracing::{debug, info, trace};
 
-use crate::core::http::get_authed;
+use crate::core::http::authed_request;
 
 use super::config::Auth;
 use super::http::CLIENT;
-use super::model::Post;
+use super::model::{Post, Vote};
+
+const BASE_URL: &str = "https://e621.net";
 
 #[derive(Debug, Error)]
 pub enum ApiError {
@@ -15,10 +18,13 @@ pub enum ApiError {
 
     #[error("Deserialization failed: {0}")]
     Deserialize(#[from] serde_json::Error),
+
+    #[error("Voting error: {0}")]
+    VoteError(String),
 }
 
 #[derive(Deserialize)]
-struct ApiResponse {
+struct PostsResponse {
     posts: Vec<Post>,
 }
 
@@ -27,20 +33,58 @@ pub async fn fetch_posts(
     before_id: Option<u32>,
     auth: Option<Auth>,
 ) -> Result<Vec<Post>, ApiError> {
-    let mut url = format!("https://e621.net/posts.json?tags={}", tag);
+    let mut url = format!("{BASE_URL}/posts.json?tags={}", tag);
 
     if let Some(id) = before_id {
         url.push_str(&format!("&page=b{}", id));
     }
 
     trace!("GET {url}");
-    let res = get_authed(&CLIENT, &url, auth.as_ref())
+    let res = authed_request(&CLIENT, Method::GET, &url, auth.as_ref())
         .send()
         .await?
-        .json::<ApiResponse>()
+        .json::<PostsResponse>()
         .await?;
     let length = &res.posts.len();
 
     info!("Got {length} results for {tag}");
     Ok(res.posts)
+}
+
+#[derive(Deserialize)]
+struct VoteResponse {
+    our_score: i8,
+}
+
+pub async fn vote_post(id: u32, vote: Vote, auth: Auth) -> Result<Option<Vote>, ApiError> {
+    let url = format!("{BASE_URL}/posts/{id}/votes.json");
+
+    let res = authed_request(&CLIENT, Method::POST, &url, Some(&auth))
+        .json(&serde_json::json!({ "score": vote as i8 }))
+        .send()
+        .await?;
+
+    if res.status().is_success() {
+        let parsed: VoteResponse = res
+            .json()
+            .await
+            .map_err(|e| ApiError::VoteError(format!("Invalid vote response: {}", e)))?;
+
+        let confirmed: Option<Vote> = match parsed.our_score {
+            1 => Some(Vote::Upvote),
+            -1 => Some(Vote::Downvote),
+            0 => None,
+            _ => {
+                return Err(ApiError::VoteError(format!(
+                    "Vote failed: unexpected value {}",
+                    parsed.our_score
+                )))
+            }
+        };
+
+        Ok(confirmed)
+    } else {
+        let error_text = res.text().await.unwrap_or_default();
+        Err(ApiError::VoteError(error_text))
+    }
 }

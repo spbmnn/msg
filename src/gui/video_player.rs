@@ -1,6 +1,7 @@
 use std::fmt;
 use std::time::Duration;
 
+use gstreamer as gst;
 use iced::{
     widget::{button, column, row, text, Slider},
     Element, Length, Task,
@@ -62,7 +63,7 @@ impl VideoPlayerWidget {
             VideoPlayerMessage::SeekRelease => {
                 self.dragging_cursor = false;
                 self.video
-                    .seek(Duration::from_secs_f64(self.position))
+                    .seek(Duration::from_secs_f64(self.position), false)
                     .expect("couldn't seek");
                 self.video.set_paused(false);
             }
@@ -81,12 +82,8 @@ impl VideoPlayerWidget {
     pub fn view(&self) -> Element<'_, VideoPlayerMessage> {
         let controls = row![
             // TODO: add loop controls/progress bar, slider
-            button(if self.video.paused() {
-                "⏵︎"
-            } else {
-                "⏸︎"
-            })
-            .on_press(VideoPlayerMessage::TogglePause),
+            button(if self.video.paused() { "|>" } else { "||" })
+                .on_press(VideoPlayerMessage::TogglePause),
         ];
 
         column![VideoPlayer::new(&self.video), controls]

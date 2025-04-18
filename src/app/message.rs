@@ -3,7 +3,7 @@ use iced::widget::text_editor::Action;
 use url::Url;
 
 use crate::core::config::Config;
-use crate::core::model::Post;
+use crate::core::model::{Post, Vote};
 use crate::gui::video_player::VideoPlayerMessage;
 
 #[derive(Debug, Clone)]
@@ -42,6 +42,9 @@ pub enum SearchMessage {
 #[derive(Debug, Clone)]
 pub enum PostMessage {
     View(u32),
+    Vote(u32, Vote),
+    VoteResult(u32, Option<Vote>),
+    Favorite(u32),
 }
 
 /// Messages to manage media display.

@@ -1,10 +1,12 @@
-use iced::widget::{button, column, container, image, image::Handle, row, scrollable, text};
-use iced::widget::{Column, Text};
-use iced::{Element, Length};
+use iced::widget::{button, column, container, image, row, scrollable, text};
+use iced::widget::{Column, Row, Text};
+use iced::{Alignment, Element, Length};
 use iced_gif::{Frames, Gif};
 use iced_video_player::VideoPlayer;
 use tracing::error;
 
+use crate::app::message::PostMessage;
+use crate::core::model::Vote;
 use crate::{
     app::message::{DetailMessage, FollowedMessage, MediaMessage, SearchMessage, ViewMessage},
     app::Message,
@@ -30,7 +32,8 @@ pub fn render_detail<'a>(
             Rating::Explicit => "Rating: Explicit",
         }),
         text(format!("score: {}", post.score.total)),
-        render_media(post, store, video_player)
+        render_media(post, store, video_player),
+        vote_bar(post, store),
     ];
 
     let info_panel = info_panel(&post);
@@ -117,4 +120,28 @@ fn render_tag(tag: &String) -> Element<'_, Message> {
             .padding(4),
     ]
     .into()
+}
+
+fn vote_bar<'a>(post: &'a Post, store: &'a PostStore) -> Row<'a, Message> {
+    let vote_status = store.vote_for(post.id);
+    let favorite_status = store.is_favorited(post.id);
+
+    let upvote_button = button("↑").on_press(match vote_status {
+        Some(Vote::Upvote) => Message::Post(PostMessage::Vote(post.id, None)),
+        _ => Message::Post(PostMessage::Vote(post.id, Some(Vote::Upvote))),
+    });
+    let downvote_button = button("↓").on_press(match vote_status {
+        Some(Vote::Downvote) => Message::Post(PostMessage::Vote(post.id, None)),
+        _ => Message::Post(PostMessage::Vote(post.id, Some(Vote::Downvote))),
+    });
+
+    let fav_button = button("fav").on_press(Message::Post(PostMessage::Favorite(post.id)));
+
+    row![
+        upvote_button,
+        text(format!("{}", post.score.total)),
+        downvote_button,
+        fav_button
+    ]
+    .spacing(12)
 }

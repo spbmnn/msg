@@ -42,9 +42,10 @@ pub enum SearchMessage {
 #[derive(Debug, Clone)]
 pub enum PostMessage {
     View(u32),
-    Vote(u32, Vote),
+    Vote(u32, Option<Vote>),
     VoteResult(u32, Option<Vote>),
     Favorite(u32),
+    FavoriteResult(u32, bool),
 }
 
 /// Messages to manage media display.

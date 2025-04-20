@@ -3,7 +3,7 @@ use crate::app::message::{
     SettingsMessage, StartupMessage, ViewMessage,
 };
 use crate::app::state::{App, ViewMode};
-use crate::core::api::{fetch_posts, vote_post};
+use crate::core::api::{favorite_post, fetch_posts, unfavorite_post, vote_post};
 use crate::core::config::{Auth, Config};
 use crate::core::media::fetch_preview;
 use crate::core::media::{fetch_gif, fetch_image, fetch_video};
@@ -184,14 +184,46 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
         }
         PostMessage::Vote(id, vote) => {
             return Task::perform(
-                vote_post(id, vote, app.config.auth.unwrap()),
+                vote_post(id, vote, app.config.auth.clone().unwrap()),
                 move |res| match res {
                     Ok(v) => Message::Post(PostMessage::VoteResult(id, v)),
-                    Err(e) => Message::Tick,
+                    Err(err) => {
+                        error!("{err}");
+                        Message::Tick
+                    }
                 },
             );
         }
-        PostMessage::Favorite(id) => {}
+        PostMessage::Favorite(id) => {
+            let is_favorite = app.store.is_favorited(id);
+            if is_favorite {
+                return Task::perform(
+                    unfavorite_post(id, app.config.auth.clone().unwrap()),
+                    move |res| match res {
+                        Ok(()) => Message::Post(PostMessage::FavoriteResult(id, false)),
+                        Err(err) => {
+                            error!("{err}");
+                            Message::Tick
+                        }
+                    },
+                );
+            } else {
+                return Task::perform(
+                    favorite_post(id, app.config.auth.clone().unwrap()),
+                    move |res| match res {
+                        Ok(()) => Message::Post(PostMessage::FavoriteResult(id, true)),
+                        Err(err) => {
+                            error!("{err}");
+                            Message::Tick
+                        }
+                    },
+                );
+            }
+        }
+        PostMessage::FavoriteResult(id, favorited) => {
+            app.store.set_favorite(id, favorited);
+            Task::none()
+        }
         PostMessage::VoteResult(id, result) => {
             app.store.set_vote(id, result);
             Task::none()

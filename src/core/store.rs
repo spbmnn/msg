@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::File,
     io::{BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
@@ -35,12 +35,14 @@ pub enum StoreError {
 #[derive(Debug, Default)]
 pub struct PostStore {
     posts: HashMap<u32, Post>,
-    votes: HashMap<u32, Vote>,
     thumbnails: HashMap<u32, Handle>,
     images: HashMap<u32, Handle>,
     gifs: HashMap<u32, Vec<u8>>,
     pub gif_frames: HashMap<u32, Frames>,
     videos: HashMap<u32, Url>,
+
+    votes: HashMap<u32, Vote>,
+    favorites: HashSet<u32>,
 }
 
 impl PostStore {
@@ -53,6 +55,7 @@ impl PostStore {
             gifs: HashMap::new(),
             gif_frames: HashMap::new(),
             videos: HashMap::new(),
+            favorites: HashSet::new(),
         }
     }
 
@@ -89,8 +92,37 @@ impl PostStore {
         }
     }
 
+    /// Get the user's vote for a given post.
     pub fn vote_for(&self, post_id: u32) -> Option<Vote> {
         self.votes.get(&post_id).copied()
+    }
+
+    pub fn save_votes_to(&self, path: &Path) -> Result<(), StoreError> {
+        let file = File::create(path)?;
+        let writer = BufWriter::new(file);
+
+        Ok(self.votes.serialize(&mut Serializer::new(writer))?)
+    }
+
+    pub fn load_votes_from(&mut self, path: &Path) -> Result<(), StoreError> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        self.votes = rmp_serde::decode::from_read(reader)?;
+        Ok(())
+    }
+
+    // --- Favorites ---
+
+    pub fn is_favorited(&self, id: u32) -> bool {
+        self.favorites.contains(&id)
+    }
+
+    pub fn set_favorite(&mut self, id: u32, favorited: bool) {
+        if favorited {
+            self.favorites.insert(id);
+        } else {
+            self.favorites.remove(&id);
+        }
     }
 
     // --- Thumbnails ---
@@ -162,20 +194,6 @@ impl PostStore {
 
     pub fn has_video(&self, id: u32) -> bool {
         self.videos.contains_key(&id)
-    }
-
-    pub fn save_votes_to(&self, path: &Path) -> Result<(), StoreError> {
-        let file = File::create(path)?;
-        let writer = BufWriter::new(file);
-
-        Ok(self.votes.serialize(&mut Serializer::new(writer))?)
-    }
-
-    pub fn load_votes_from(&mut self, path: &Path) -> Result<(), StoreError> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        self.votes = rmp_serde::decode::from_read(reader)?;
-        Ok(())
     }
 }
 

@@ -6,3 +6,4 @@ pub mod http;
 pub mod media;
 pub mod model;
 pub mod store;
+pub mod tracing;

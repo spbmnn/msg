@@ -1,6 +1,7 @@
+use iced::theme::Palette;
 use iced::widget::{button, column, container, image, row, scrollable, text};
 use iced::widget::{Column, Row, Text};
-use iced::{Alignment, Element, Length};
+use iced::{Alignment, Element, Length, Theme};
 use iced_gif::{Frames, Gif};
 use iced_video_player::VideoPlayer;
 use tracing::error;
@@ -34,6 +35,7 @@ pub fn render_detail<'a>(
         text(format!("score: {}", post.score.total)),
         render_media(post, store, video_player),
         vote_bar(post, store),
+        text(post.description.clone()),
     ];
 
     let info_panel = info_panel(&post);
@@ -124,18 +126,50 @@ fn render_tag(tag: &String) -> Element<'_, Message> {
 
 fn vote_bar<'a>(post: &'a Post, store: &'a PostStore) -> Row<'a, Message> {
     let vote_status = store.vote_for(post.id);
-    let favorite_status = store.is_favorited(post.id);
+    let is_favorited = store.is_favorited(post.id);
 
-    let upvote_button = button("↑").on_press(match vote_status {
-        Some(Vote::Upvote) => Message::Post(PostMessage::Vote(post.id, None)),
-        _ => Message::Post(PostMessage::Vote(post.id, Some(Vote::Upvote))),
-    });
-    let downvote_button = button("↓").on_press(match vote_status {
-        Some(Vote::Downvote) => Message::Post(PostMessage::Vote(post.id, None)),
-        _ => Message::Post(PostMessage::Vote(post.id, Some(Vote::Downvote))),
-    });
+    let upvote_button = button("↑")
+        .on_press(match vote_status {
+            Some(Vote::Upvote) => Message::Post(PostMessage::Vote(post.id, None)),
+            _ => Message::Post(PostMessage::Vote(post.id, Some(Vote::Upvote))),
+        })
+        .style(move |theme: &Theme, _status| {
+            let palette = theme.extended_palette();
 
-    let fav_button = button("fav").on_press(Message::Post(PostMessage::Favorite(post.id)));
+            match vote_status {
+                Some(Vote::Upvote) => {
+                    button::Style::default().with_background(palette.success.strong.color)
+                }
+                _ => button::Style::default(),
+            }
+        });
+    let downvote_button = button("↓")
+        .on_press(match vote_status {
+            Some(Vote::Downvote) => Message::Post(PostMessage::Vote(post.id, None)),
+            _ => Message::Post(PostMessage::Vote(post.id, Some(Vote::Downvote))),
+        })
+        .style(move |theme: &Theme, _status| {
+            let palette = theme.extended_palette();
+
+            match vote_status {
+                Some(Vote::Downvote) => {
+                    button::Style::default().with_background(palette.danger.strong.color)
+                }
+                _ => button::Style::default(),
+            }
+        });
+
+    let fav_button = button("fav")
+        .on_press(Message::Post(PostMessage::Favorite(post.id)))
+        .style(move |theme: &Theme, _status| {
+            let palette = theme.extended_palette();
+
+            if is_favorited {
+                button::Style::default().with_background(palette.primary.strong.color)
+            } else {
+                button::Style::default()
+            }
+        });
 
     row![
         upvote_button,

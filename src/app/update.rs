@@ -9,12 +9,13 @@ use crate::core::media::fetch_preview;
 use crate::core::media::{fetch_gif, fetch_image, fetch_video};
 use crate::core::model::{FollowedTag, Post, PostType};
 use crate::core::store::data_dir;
-use crate::core::{blacklist, media};
+use crate::core::{blacklist, followed, media};
 use crate::gui::video_player::VideoPlayerWidget;
 use iced::{window, Task};
 use iced_video_player::Video;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
+#[instrument(skip(app))]
 pub fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::Startup(msg) => update_startup(app, msg),
@@ -41,8 +42,9 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             app.posts.clear();
             app.selected_post = None;
             app.search.query = query.clone();
+            let auth = app.config.auth.clone();
             return Task::perform(
-                crate::core::api::fetch_posts(query.clone(), None, app.config.auth.clone()),
+                async move { fetch_posts(auth.as_ref(), query.clone(), None).await },
                 move |res| match res {
                     Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
                     Err(err) => {
@@ -56,8 +58,9 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             let before_id = app.posts.iter().map(|p| p.id).min();
             app.loading = true;
             let query = app.search.input.clone();
+            let auth = app.config.auth.clone();
             return Task::perform(
-                crate::core::api::fetch_posts(query.clone(), before_id, app.config.auth.clone()),
+                async move { fetch_posts(auth.as_ref(), query.clone(), before_id).await },
                 move |res| match res {
                     Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
                     Err(err) => {
@@ -81,6 +84,9 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             app.posts.extend(new_posts.clone());
 
             for post in &new_posts {
+                if post.is_favorited {
+                    app.store.set_favorite(post.id, true);
+                }
                 if post.preview.url.is_some() {
                     app.search.thumbnail_queue.push_back(post.id);
                 }
@@ -95,8 +101,9 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             app.search.query = query.clone();
             if !query.is_empty() {
                 info!("Submitting search for {query}");
+                let auth = app.config.auth.clone();
                 return Task::perform(
-                    fetch_posts(query.clone(), None, app.config.auth.clone()),
+                    async move { fetch_posts(auth.as_ref(), query.clone(), None).await },
                     move |res| match res {
                         Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
                         Err(err) => {
@@ -183,8 +190,9 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
             return Task::batch(commands);
         }
         PostMessage::Vote(id, vote) => {
+            let auth = app.config.auth.clone().unwrap_or_default();
             return Task::perform(
-                vote_post(id, vote, app.config.auth.clone().unwrap()),
+                async move { vote_post(&auth, id, vote).await },
                 move |res| match res {
                     Ok(v) => Message::Post(PostMessage::VoteResult(id, v)),
                     Err(err) => {
@@ -196,9 +204,10 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
         }
         PostMessage::Favorite(id) => {
             let is_favorite = app.store.is_favorited(id);
+            let auth = app.config.auth.clone().unwrap_or_default();
             if is_favorite {
                 return Task::perform(
-                    unfavorite_post(id, app.config.auth.clone().unwrap()),
+                    async move { unfavorite_post(&auth, id).await },
                     move |res| match res {
                         Ok(()) => Message::Post(PostMessage::FavoriteResult(id, false)),
                         Err(err) => {
@@ -208,16 +217,15 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
                     },
                 );
             } else {
-                return Task::perform(
-                    favorite_post(id, app.config.auth.clone().unwrap()),
-                    move |res| match res {
+                return Task::perform(async move { favorite_post(&auth, id).await }, move |res| {
+                    match res {
                         Ok(()) => Message::Post(PostMessage::FavoriteResult(id, true)),
                         Err(err) => {
                             error!("{err}");
                             Message::Tick
                         }
-                    },
-                );
+                    }
+                });
             }
         }
         PostMessage::FavoriteResult(id, favorited) => {
@@ -233,7 +241,10 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
 
 fn update_media(app: &mut App, msg: MediaMessage) -> Task<Message> {
     match msg {
-        MediaMessage::ThumbnailLoaded(id, handle) => app.store.insert_thumbnail(id, handle),
+        MediaMessage::ThumbnailLoaded(id, handle) => {
+            debug!("Storing thumbnail for {id}");
+            app.store.insert_thumbnail(id, handle)
+        }
         MediaMessage::ImageLoaded(id, handle) => app.store.insert_image(id, handle),
         MediaMessage::GifLoaded(id, gif) => {
             let frames = iced_gif::Frames::from_bytes(gif.clone());
@@ -275,8 +286,11 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
             app.search.input = app.search.query.clone();
             app.loading = true;
 
+            let auth = app.config.auth.clone();
+            let query = app.search.query.clone();
+
             return Task::perform(
-                fetch_posts(app.search.query.clone(), None, app.config.auth.clone()),
+                async move { fetch_posts(auth.as_ref(), query, None).await },
                 move |res| match res {
                     Ok(posts) => {
                         if posts.len() == 0 {
@@ -298,8 +312,11 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
             app.search.input = app.search.query.clone();
             app.loading = true;
 
+            let auth = app.config.auth.clone();
+            let query = app.search.query.clone();
+
             return Task::perform(
-                fetch_posts(app.search.query.clone(), None, app.config.auth.clone()),
+                async move { fetch_posts(auth.as_ref(), query, None).await },
                 move |res| match res {
                     Ok(posts) => {
                         if posts.len() == 0 {
@@ -364,11 +381,46 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
 
 fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
     match msg {
-        FollowedMessage::CheckUpdates => {}
-        FollowedMessage::UpdatesReceived(updates) => {}
+        FollowedMessage::CheckUpdates => {
+            app.ui.view_mode = ViewMode::Followed;
+            app.posts.clear();
+
+            let tags = app.followed.tags.clone();
+            let auth = app.config.auth.clone();
+
+            return Task::perform(
+                async move { followed::check_for_updates(tags, auth.as_ref()).await },
+                move |res| match res {
+                    Ok(updates) => Message::Followed(FollowedMessage::UpdatesReceived(updates)),
+                    Err(err) => {
+                        error!("{err}");
+                        Message::View(ViewMessage::ShowGrid)
+                    }
+                },
+            );
+        }
+        FollowedMessage::UpdatesReceived(updates) => {
+            app.posts.clear();
+            for (_, posts) in app.followed.new_followed_posts.clone() {
+                for post in posts {
+                    let id = post.id;
+                    app.posts.push(post.clone());
+                    app.store.insert_post(post.clone());
+                    if post.preview.url.is_some() {
+                        trace!("Queueing thumbnail for {id}");
+                        app.search.thumbnail_queue.push_back(post.id);
+                    }
+                }
+            }
+
+            app.followed.new_followed_posts = updates;
+
+            return Task::done(Message::Tick);
+        }
         FollowedMessage::AddTag => {
             let tag = app.followed.new_followed_tag.trim();
             if !tag.is_empty() && !app.followed.tags.iter().any(|f| f.tag == tag) {
+                info!("Adding tag {tag}");
                 app.followed.tags.push(FollowedTag {
                     tag: tag.to_string(),
                     last_seen_post_id: None,
@@ -379,12 +431,20 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
             }
             app.followed.new_followed_tag.clear();
         }
-        FollowedMessage::FollowTag(tag) => {}
+        FollowedMessage::FollowTag(tag) => {
+            app.followed.tags.push(FollowedTag {
+                tag: tag.to_string(),
+                last_seen_post_id: None,
+            });
+
+            app.config.followed_tags = app.followed.tags.clone();
+            let _ = app.config.save();
+        }
         FollowedMessage::RemoveTag(tag) => {
             app.followed.tags.retain(|f| f.tag != tag);
 
             app.config.followed_tags = app.followed.tags.clone();
-            let _ = app.config.save(); // TODO: make this a function of config?
+            let _ = app.config.save();
         }
     }
     Task::none()
@@ -411,6 +471,8 @@ fn tick(app: &mut App) -> Task<Message> {
     if let Some(post_id) = app.search.thumbnail_queue.pop_front() {
         if let Some(post) = app.posts.iter().find(|p| p.id == post_id) {
             if let Some(url) = &post.preview.url {
+                let id = post.id;
+                trace!("Fetching thumbnail for {id}");
                 return Task::perform(fetch_preview(post_id, url.clone()), move |res| match res {
                     Ok(thumb) => Message::Media(MediaMessage::ThumbnailLoaded(post_id, thumb)),
                     Err(err) => {
@@ -419,6 +481,7 @@ fn tick(app: &mut App) -> Task<Message> {
                     }
                 });
             }
+            warn!("Queue entry has no preview");
         }
     }
     Task::none()

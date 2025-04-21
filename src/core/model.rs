@@ -5,7 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display};
+use std::fmt::{self};
 
 /// Represents a post on e621.
 #[derive(Clone, Serialize, Deserialize)]
@@ -18,6 +18,7 @@ pub struct Post {
     pub score: Score,
     pub tags: Tags,
     pub rating: Rating,
+    pub is_favorited: bool,
     //pub fav_count: u32,
     //pub sources: Vec<String>,
     //pub pools: Vec<u32>,
@@ -100,7 +101,17 @@ impl fmt::Display for Post {
 
 impl fmt::Debug for Post {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "post #{}", self.id)
+        let mut builder = f.debug_struct("Post");
+
+        builder
+            .field("id", &self.id)
+            .field("score", &self.score.total)
+            .field("rating", &self.rating)
+            .field("favorited", &self.is_favorited)
+            .field("preview", &self.preview.url)
+            .field("file_ext", &self.file.ext);
+
+        builder.finish()
     }
 }
 

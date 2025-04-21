@@ -20,7 +20,9 @@ pub fn render_grid(app: &App) -> Element<'_, Message> {
         button("settings")
             .on_press(Message::View(ViewMessage::ShowSettings))
             .padding(8),
-        button("check").on_press(Message::Followed(FollowedMessage::CheckUpdates))
+        button("check")
+            .on_press(Message::Followed(FollowedMessage::CheckUpdates))
+            .padding(8)
     ]
     .spacing(8);
 
@@ -42,6 +44,5 @@ pub fn render_grid(app: &App) -> Element<'_, Message> {
         scrollable(content.padding(16)).width(Length::Fill)
     ]
     .width(Length::Fill)
-    .height(Length::Fill)
     .into()
 }

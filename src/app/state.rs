@@ -5,6 +5,7 @@ use iced::Task;
 use tracing::{debug, error};
 
 use crate::app::message::SearchMessage;
+use crate::core::api::fetch_posts;
 use crate::core::config::Config;
 use crate::core::model::{FollowedTag, Post};
 use crate::core::store::{data_dir, PostStore};
@@ -53,6 +54,7 @@ pub enum ViewMode {
     Grid,
     Detail(u32),
     Settings,
+    Followed,
 }
 
 #[derive(Debug)]
@@ -92,7 +94,7 @@ impl App {
         };
 
         let cmd = Task::perform(
-            crate::core::api::fetch_posts(String::from("fav:homogoat"), None, None), // should fix
+            fetch_posts(None, String::from("fav:homogoat"), None), // should fix
             move |res| match res {
                 Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
                 Err(err) => {

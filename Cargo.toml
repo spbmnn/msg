@@ -7,8 +7,10 @@ build = "build.rs"
 [dependencies]
 anyhow = "1.0.97"
 base64 = "0.22.1"
+bincode = { version = "2.0.1", features = ["serde"] }
 chrono = { version = "0.4.40", features = ["serde", "std"] }
 directories = "6.0.0"
+futures = "0.3.31"
 glib = "0.20.9"
 gstreamer = "0.23.5"
 gstreamer-app = "0.23.5"
@@ -33,7 +35,13 @@ tokio = { version = "1", features = [
 ] }
 toml = "0.8.20"
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.19", features = [
+    "env-filter",
+    "fmt",
+    "time",
+    "std",
+    "ansi",
+] }
 url = "2.5.4"
 
 [patch.crates-io]

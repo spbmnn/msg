@@ -1,13 +1,16 @@
 use reqwest::Method;
 use serde::Deserialize;
 use thiserror::Error;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, instrument, trace};
 
 use crate::core::http::authed_request;
 
 use super::config::Auth;
 use super::http::CLIENT;
 use super::model::{Post, Vote};
+
+pub mod rate_limiter;
+use rate_limiter::API_LIMITER;
 
 const BASE_URL: &str = "https://e621.net";
 
@@ -28,10 +31,11 @@ struct PostsResponse {
     posts: Vec<Post>,
 }
 
+#[instrument]
 pub async fn fetch_posts(
+    auth: Option<&Auth>,
     tag: String,
     before_id: Option<u32>,
-    auth: Option<Auth>,
 ) -> Result<Vec<Post>, ApiError> {
     let mut url = format!("{BASE_URL}/posts.json?tags={}", tag);
 
@@ -40,11 +44,26 @@ pub async fn fetch_posts(
     }
 
     trace!("GET {url}");
-    let res = authed_request(&CLIENT, Method::GET, &url, auth.as_ref())
-        .send()
-        .await?
-        .json::<PostsResponse>()
-        .await?;
+    let text: String = match auth {
+        Some(auth) => {
+            API_LIMITER
+                .run(async {
+                    authed_request(&CLIENT, Method::GET, &url, auth)
+                        .send()
+                        .await?
+                        .text()
+                        .await
+                })
+                .await?
+        }
+        None => {
+            API_LIMITER
+                .run(async { CLIENT.get(&url).send().await?.text().await })
+                .await?
+        }
+    };
+    trace!("Raw response: {text}");
+    let res: PostsResponse = serde_json::from_str(&text)?;
     let length = &res.posts.len();
 
     info!("Got {length} results for {tag}");
@@ -56,14 +75,20 @@ struct VoteResponse {
     our_score: i8,
 }
 
-pub async fn vote_post(id: u32, vote: Option<Vote>, auth: Auth) -> Result<Option<Vote>, ApiError> {
+#[instrument(skip(auth))]
+pub async fn vote_post(auth: &Auth, id: u32, vote: Option<Vote>) -> Result<Option<Vote>, ApiError> {
     let url = format!("{BASE_URL}/posts/{id}/votes.json");
 
     match vote {
         None => {
-            let res = authed_request(&CLIENT, Method::DELETE, &url, Some(&auth))
-                .json(&serde_json::json!({ "id": id }))
-                .send()
+            trace!("DELETE {url}");
+            let res = API_LIMITER
+                .run(async {
+                    authed_request(&CLIENT, Method::DELETE, &url, auth)
+                        .json(&serde_json::json!({ "id": id }))
+                        .send()
+                        .await
+                })
                 .await?;
 
             if res.status().is_success() {
@@ -74,9 +99,14 @@ pub async fn vote_post(id: u32, vote: Option<Vote>, auth: Auth) -> Result<Option
             }
         }
         Some(vote) => {
-            let res = authed_request(&CLIENT, Method::POST, &url, Some(&auth))
-                .json(&serde_json::json!({ "id": id, "score": vote as i8 }))
-                .send()
+            trace!("POST {url}");
+            let res = API_LIMITER
+                .run(async {
+                    authed_request(&CLIENT, Method::POST, &url, auth)
+                        .json(&serde_json::json!({ "id": id, "score": vote as i8 }))
+                        .send()
+                        .await
+                })
                 .await?;
 
             if res.status().is_success() {
@@ -106,12 +136,18 @@ pub async fn vote_post(id: u32, vote: Option<Vote>, auth: Auth) -> Result<Option
     }
 }
 
-pub async fn favorite_post(id: u32, auth: Auth) -> Result<(), ApiError> {
+#[instrument(skip(auth))]
+pub async fn favorite_post(auth: &Auth, id: u32) -> Result<(), ApiError> {
     let url = format!("{BASE_URL}/favorites.json");
 
-    let res = authed_request(&CLIENT, Method::POST, &url, Some(&auth))
-        .json(&serde_json::json!({ "post_id": id }))
-        .send()
+    trace!("POST {url}");
+    let res = API_LIMITER
+        .run(async {
+            authed_request(&CLIENT, Method::POST, &url, auth)
+                .json(&serde_json::json!({ "post_id": id }))
+                .send()
+                .await
+        })
         .await?;
 
     if res.status().is_success() {
@@ -122,12 +158,18 @@ pub async fn favorite_post(id: u32, auth: Auth) -> Result<(), ApiError> {
     }
 }
 
-pub async fn unfavorite_post(id: u32, auth: Auth) -> Result<(), ApiError> {
+#[instrument(skip(auth))]
+pub async fn unfavorite_post(auth: &Auth, id: u32) -> Result<(), ApiError> {
     let url = format!("{BASE_URL}/favorites.json");
 
-    let res = authed_request(&CLIENT, Method::DELETE, &url, Some(&auth))
-        .json(&serde_json::json!({ "post_id": id }))
-        .send()
+    trace!("DELETE {url}");
+    let res = API_LIMITER
+        .run(async {
+            authed_request(&CLIENT, Method::DELETE, &url, auth)
+                .json(&serde_json::json!({ "post_id": id }))
+                .send()
+                .await
+        })
         .await?;
 
     if res.status().is_success() {

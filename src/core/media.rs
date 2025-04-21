@@ -55,6 +55,7 @@ pub enum MediaError {
 }
 
 pub async fn fetch_preview(id: u32, url: String) -> Result<Handle, MediaError> {
+    trace!("Fetching preview for {id}");
     let file_path: PathBuf = cache_dir().join("thumbnails").join(format!("{}.jpg", id));
 
     if file_path.exists() {

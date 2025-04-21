@@ -15,25 +15,7 @@ pub static CLIENT: Lazy<Client> = Lazy::new(|| {
         .expect("failed to build reqwest Client")
 });
 
-pub fn get_authed(client: &Client, url: &str, auth: Option<&Auth>) -> RequestBuilder {
-    let request = client.get(url);
-    if let Some(auth) = auth {
-        request.basic_auth(&auth.username, Some(&auth.api_key))
-    } else {
-        request
-    }
-}
-
-pub fn authed_request(
-    client: &Client,
-    method: Method,
-    url: &str,
-    auth: Option<&Auth>,
-) -> RequestBuilder {
+pub fn authed_request(client: &Client, method: Method, url: &str, auth: &Auth) -> RequestBuilder {
     let request = client.request(method, url);
-    if let Some(auth) = auth {
-        request.basic_auth(&auth.username, Some(&auth.api_key))
-    } else {
-        request
-    }
+    request.basic_auth(&auth.username, Some(&auth.api_key))
 }

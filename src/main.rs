@@ -3,13 +3,11 @@ mod core;
 mod gui;
 mod util;
 
-use gstreamer as gst;
-
 use app::App;
-use tracing::{error, info, level_filters::LevelFilter};
+use tracing::{error, info};
 
 fn main() -> iced::Result {
-    init_tracing();
+    crate::core::tracing::init_tracing();
     info!("logging initialized");
 
     if let Err(e) = util::gstreamer_check::verify_gstreamer_plugins() {
@@ -21,14 +19,4 @@ fn main() -> iced::Result {
         .exit_on_close_request(false)
         .subscription(app::subscription)
         .run_with(App::new)
-}
-
-fn init_tracing() {
-    use tracing_subscriber::EnvFilter;
-
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_target(true)
-        .with_line_number(true)
-        .init();
 }

@@ -9,7 +9,7 @@ use directories::ProjectDirs;
 use iced::widget::image::Handle;
 use iced_gif::Frames;
 use rmp_serde::Serializer;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::{debug, trace};
 use url::Url;
@@ -32,17 +32,17 @@ pub enum StoreError {
 }
 
 /// Stores media for posts.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PostStore {
-    posts: HashMap<u32, Post>,
-    thumbnails: HashMap<u32, Handle>,
-    images: HashMap<u32, Handle>,
-    gifs: HashMap<u32, Vec<u8>>,
+    pub posts: HashMap<u32, Post>,
+    pub thumbnails: HashMap<u32, Handle>,
+    pub images: HashMap<u32, Handle>,
+    pub gifs: HashMap<u32, Vec<u8>>,
     pub gif_frames: HashMap<u32, Frames>,
-    videos: HashMap<u32, Url>,
+    pub videos: HashMap<u32, Url>,
 
-    votes: HashMap<u32, Vote>,
-    favorites: HashSet<u32>,
+    pub votes: HashMap<u32, Vote>,
+    pub favorites: HashSet<u32>,
 }
 
 impl PostStore {
@@ -195,11 +195,33 @@ impl PostStore {
     pub fn has_video(&self, id: u32) -> bool {
         self.videos.contains_key(&id)
     }
+
+    pub fn save(&self, path: &Path) -> Result<(), StoreError> {
+        let file = File::create(path)?;
+        let writer = BufWriter::new(file);
+
+        Ok(self.votes.serialize(&mut Serializer::new(writer))?)
+    }
+
+    pub fn load(path: &Path) -> Result<Self, StoreError> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        rmp_serde::decode::from_read(reader)?
+    }
 }
 
-pub fn data_dir() -> PathBuf {
+pub fn poststore_path() -> Option<PathBuf> {
     ProjectDirs::from("xyz", "stripywalrus", "msg")
-        .unwrap()
-        .data_dir()
-        .to_path_buf()
+        .map(|dirs| dirs.data_local_dir().join("store.mpk"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn path_is_resolved() {
+        let path = poststore_path().expect("should resolve");
+        assert!(path.ends_with("store.mpk"));
+    }
 }

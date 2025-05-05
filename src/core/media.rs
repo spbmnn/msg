@@ -13,7 +13,7 @@ use iced::widget::image::Handle;
 use iced_video_player::Video;
 use image::DynamicImage;
 use thiserror::Error;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, instrument, trace, warn};
 use url::Url;
 
 use super::http::CLIENT;
@@ -54,6 +54,7 @@ pub enum MediaError {
     Request(#[from] reqwest::Error),
 }
 
+#[instrument(skip(url))]
 pub async fn fetch_preview(id: u32, url: String) -> Result<Handle, MediaError> {
     trace!("Fetching preview for {id}");
     let file_path: PathBuf = cache_dir().join("thumbnails").join(format!("{}.jpg", id));
@@ -74,6 +75,7 @@ pub async fn fetch_preview(id: u32, url: String) -> Result<Handle, MediaError> {
     Ok(Handle::from_bytes(bytes.to_vec()))
 }
 
+#[instrument(skip(file))]
 pub async fn fetch_image(id: u32, file: File) -> Result<Handle, MediaError> {
     let id = id;
     let ext = file.ext.unwrap_or("jpg".to_string());
@@ -121,6 +123,7 @@ pub async fn fetch_image(id: u32, file: File) -> Result<Handle, MediaError> {
     Ok(Handle::from_bytes(buf))
 }
 
+#[instrument(skip(url))]
 pub async fn fetch_gif(id: u32, url: String) -> Result<Vec<u8>, MediaError> {
     let file_path: PathBuf = cache_dir().join("gifs").join(format!("{}.gif", id));
 
@@ -139,6 +142,7 @@ pub async fn fetch_gif(id: u32, url: String) -> Result<Vec<u8>, MediaError> {
     Ok(bytes.to_vec())
 }
 
+#[instrument(skip(url))]
 pub async fn fetch_video(id: u32, url: String, ext: String) -> Result<Url, MediaError> {
     let file_path: PathBuf = cache_dir().join("video").join(format!("{}.{}", id, ext));
 
@@ -257,4 +261,20 @@ pub fn cache_dir() -> PathBuf {
         .unwrap()
         .cache_dir()
         .to_path_buf()
+}
+
+pub fn thumbnail_dir() -> PathBuf {
+    cache_dir().join("thumbnails")
+}
+
+pub fn image_dir() -> PathBuf {
+    cache_dir().join("resized")
+}
+
+pub fn gif_dir() -> PathBuf {
+    cache_dir().join("gifs")
+}
+
+pub fn video_dir() -> PathBuf {
+    cache_dir().join("video")
 }

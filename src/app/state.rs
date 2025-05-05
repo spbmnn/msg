@@ -2,13 +2,13 @@ use std::collections::VecDeque;
 
 use iced::widget::text_editor::Content;
 use iced::Task;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::app::message::SearchMessage;
 use crate::core::api::fetch_posts;
 use crate::core::config::Config;
 use crate::core::model::{FollowedTag, Post};
-use crate::core::store::{data_dir, PostStore};
+use crate::core::store::{poststore_path, PostStore};
 use crate::gui::video_player::VideoPlayerWidget;
 
 use super::Message;
@@ -87,9 +87,26 @@ impl App {
             thumbnail_queue: VecDeque::new(),
         };
 
+        let cache = if let Some(path) = poststore_path() {
+            match PostStore::load_from(&path) {
+                Ok(store) => {
+                    info!("Loaded PostStore from {path:?}");
+                    store
+                }
+                Err(err) => {
+                    error!("Couldn't load PostStore from file: {err}");
+                    PostStore::new()
+                }
+            }
+        } else {
+            info!("Cached PostStore not found");
+            PostStore::new()
+        };
+
         let app = Self {
             config: Config::new(),
             search: search,
+            store: cache,
             ..Default::default()
         };
 
@@ -123,8 +140,8 @@ impl Default for App {
 
         let mut store = PostStore::new();
 
-        let vote_path = data_dir().join("votes.mpk");
-        store.load_votes_from(&vote_path).unwrap_or_default();
+        //let vote_path = data_dir().join("votes.mpk");
+        //store.load_votes_from(&vote_path).unwrap_or_default();
 
         Self {
             settings: Settings {

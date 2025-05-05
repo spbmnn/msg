@@ -1,21 +1,22 @@
+use std::fs;
+
 use crate::app::message::{
     DetailMessage, FollowedMessage, MediaMessage, Message, PostMessage, SearchMessage,
     SettingsMessage, StartupMessage, ViewMessage,
 };
 use crate::app::state::{App, ViewMode};
 use crate::core::api::{favorite_post, fetch_posts, unfavorite_post, vote_post};
-use crate::core::config::{Auth, Config};
+use crate::core::config::Auth;
 use crate::core::media::fetch_preview;
 use crate::core::media::{fetch_gif, fetch_image, fetch_video};
-use crate::core::model::{FollowedTag, Post, PostType};
-use crate::core::store::data_dir;
+use crate::core::model::{FollowedTag, Post};
+use crate::core::store::poststore_path;
 use crate::core::{blacklist, followed, media};
 use crate::gui::video_player::VideoPlayerWidget;
 use iced::{window, Task};
-use iced_video_player::Video;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-#[instrument(skip(app))]
+#[instrument(skip_all)]
 pub fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::Startup(msg) => update_startup(app, msg),
@@ -41,6 +42,7 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             app.loading = true;
             app.posts.clear();
             app.selected_post = None;
+            app.ui.view_mode = ViewMode::Grid;
             app.search.query = query.clone();
             let auth = app.config.auth.clone();
             return Task::perform(
@@ -74,7 +76,7 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             app.loading = false;
             let filtered = posts
                 .into_iter()
-                .filter(|p| !blacklist::is_blacklisted(p, &app.config.blacklist.rules))
+                .filter(|p| !blacklist::is_blacklisted(p, &app.config.blacklist))
                 .collect::<Vec<Post>>();
             app.store.insert_posts(filtered.clone());
             let new_posts = filtered
@@ -83,14 +85,18 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
                 .collect::<Vec<Post>>();
             app.posts.extend(new_posts.clone());
 
+            let mut queued_post_count: usize = 0;
+
             for post in &new_posts {
                 if post.is_favorited {
                     app.store.set_favorite(post.id, true);
                 }
                 if post.preview.url.is_some() {
                     app.search.thumbnail_queue.push_back(post.id);
+                    queued_post_count += 1;
                 }
             }
+            info!("Loading thumbnails for {queued_post_count} posts");
         }
         SearchMessage::InputChanged(text) => {
             app.search.input = text;
@@ -130,7 +136,7 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
 
             if let Some(post) = app.store.get_post(id) {
                 let file = &post.file.ext;
-                trace!("post file: {file:?}");
+                // trace!("post file: {file:?}");
                 // TODO: Deal with .swfs for compatiblity.
                 // *Maaaaaaaybe* ruffle support? Doubt it.
                 match post.file.ext.as_deref() {
@@ -245,10 +251,14 @@ fn update_media(app: &mut App, msg: MediaMessage) -> Task<Message> {
             debug!("Storing thumbnail for {id}");
             app.store.insert_thumbnail(id, handle)
         }
-        MediaMessage::ImageLoaded(id, handle) => app.store.insert_image(id, handle),
+        MediaMessage::ImageLoaded(id, handle) => {
+            debug!("Storing image for {id}");
+            app.store.insert_image(id, handle);
+        }
         MediaMessage::GifLoaded(id, gif) => {
             let frames = iced_gif::Frames::from_bytes(gif.clone());
             if let Ok(f) = frames {
+                debug!("Storing gif for {id}");
                 app.store.gif_frames.insert(id, f);
             } else {
                 error!("Couldn't decode gif into frames");
@@ -257,6 +267,7 @@ fn update_media(app: &mut App, msg: MediaMessage) -> Task<Message> {
             app.store.insert_gif(id, gif);
         }
         MediaMessage::VideoLoaded(id, url) => {
+            debug!("Storing video for {id}");
             app.store.insert_video(id, url.clone());
             match media::build_video_pipeline(url.as_str()) {
                 Ok(video) => {
@@ -472,7 +483,7 @@ fn tick(app: &mut App) -> Task<Message> {
         if let Some(post) = app.posts.iter().find(|p| p.id == post_id) {
             if let Some(url) = &post.preview.url {
                 let id = post.id;
-                trace!("Fetching thumbnail for {id}");
+                //trace!("Fetching thumbnail for {id}");
                 return Task::perform(fetch_preview(post_id, url.clone()), move |res| match res {
                     Ok(thumb) => Message::Media(MediaMessage::ThumbnailLoaded(post_id, thumb)),
                     Err(err) => {
@@ -491,18 +502,21 @@ fn exit(app: &mut App) -> Task<Message> {
     info!("exiting...");
 
     match &app.config.save() {
-        Ok(()) => (),
+        Ok(()) => info!("Saved config"),
         Err(err) => {
             error!("Couldn't save config: {err}");
         }
     }
 
-    let vote_path = data_dir().join("votes.mpk");
-    match app.store.save_votes_to(&vote_path) {
-        Ok(()) => (),
-        Err(err) => {
-            error!("Couldn't save votes: {err}");
+    if let Some(path) = poststore_path() {
+        match app.store.save_to(&path) {
+            Ok(()) => info!("Saved PostStore to {path:?}"),
+            Err(err) => {
+                error!("Couldn't save PostStore: {err}")
+            }
         }
+    } else {
+        warn!("Couldn't find path for PostStore");
     }
 
     return window::get_latest().and_then(window::close);

@@ -8,7 +8,9 @@ use tracing::{error, info};
 
 fn main() -> iced::Result {
     crate::core::tracing::init_tracing();
-    info!("logging initialized");
+    let name = env!("CARGO_PKG_NAME");
+    let version = env!("CARGO_PKG_VERSION");
+    info!("Starting {name} v{version}");
 
     if let Err(e) = util::gstreamer_check::verify_gstreamer_plugins() {
         error!("GStreamer check failed: {e}");

@@ -7,6 +7,7 @@ use super::{state::ViewMode, App, Message};
 
 mod debug;
 mod detail;
+mod dtext;
 mod followed;
 mod grid;
 mod settings;
@@ -26,5 +27,6 @@ pub fn view(app: &App) -> Element<'_, Message> {
 
     column![row(debug_row), scrollable(main_view)]
         .width(Length::Fill)
+        .height(Length::Fill)
         .into()
 }

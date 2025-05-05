@@ -3,8 +3,9 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use thiserror::Error;
+use tracing::info;
 
-use super::model::FollowedTag;
+use super::{blacklist::Blacklist, model::FollowedTag};
 
 const FILE_NAME: &str = "config.toml";
 
@@ -45,11 +46,6 @@ impl fmt::Debug for Auth {
     }
 }
 
-#[derive(Debug, Deserialize, Default, Serialize, Clone)]
-pub struct Blacklist {
-    pub rules: Vec<String>,
-}
-
 fn config_path() -> Result<PathBuf, ConfigError> {
     ProjectDirs::from("xyz", "stripywalrus", "msg")
         .map(|dirs| dirs.config_dir().join(FILE_NAME))
@@ -74,6 +70,8 @@ impl Config {
 
         let raw = fs::read_to_string(&path)?;
         let config = toml::from_str::<Config>(&raw)?;
+
+        info!("Loaded config from {path:?}");
         return Ok(config);
     }
 

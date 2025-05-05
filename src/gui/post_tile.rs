@@ -52,6 +52,7 @@ pub fn grid_view<'a>(
     posts: &[Post],
     images: &[Option<&Handle>],
     width: usize,
+    load_more: bool,
 ) -> Column<'a, Message> {
     let mut grid = column![];
 
@@ -65,11 +66,13 @@ pub fn grid_view<'a>(
         grid = grid.push(container(r).center_x(Length::Fill).width(Length::Fill));
     }
 
-    grid = grid.push(
-        button("load more")
-            .on_press(Message::Search(SearchMessage::LoadMorePosts))
-            .padding(8),
-    );
+    if load_more {
+        grid = grid.push(
+            button("load more")
+                .on_press(Message::Search(SearchMessage::LoadMorePosts))
+                .padding(8),
+        );
+    }
 
     grid.width(Length::Fill)
 }

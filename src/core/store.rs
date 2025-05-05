@@ -3,6 +3,7 @@ use std::{
     fs::File,
     io::{BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use directories::ProjectDirs;
@@ -11,10 +12,13 @@ use iced_gif::Frames;
 use rmp_serde::Serializer;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 use url::Url;
 
-use super::model::{Post, Vote};
+use super::{
+    media::{gif_dir, image_dir, thumbnail_dir, video_dir},
+    model::{Post, Vote},
+};
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -32,7 +36,7 @@ pub enum StoreError {
 }
 
 /// Stores media for posts.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default)]
 pub struct PostStore {
     pub posts: HashMap<u32, Post>,
     pub thumbnails: HashMap<u32, Handle>,
@@ -41,6 +45,17 @@ pub struct PostStore {
     pub gif_frames: HashMap<u32, Frames>,
     pub videos: HashMap<u32, Url>,
 
+    pub votes: HashMap<u32, Vote>,
+    pub favorites: HashSet<u32>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct PostStoreData {
+    pub posts: HashMap<u32, Post>,
+    pub thumbnails: HashMap<u32, PathBuf>,
+    pub images: HashMap<u32, PathBuf>,
+    pub gifs: HashMap<u32, PathBuf>,
+    pub videos: HashMap<u32, String>,
     pub votes: HashMap<u32, Vote>,
     pub favorites: HashSet<u32>,
 }
@@ -135,6 +150,10 @@ impl PostStore {
         self.thumbnails.get(&id)
     }
 
+    pub fn get_thumbnail_path(&self, id: u32) -> PathBuf {
+        thumbnail_dir().join(format!("{id}.jpg"))
+    }
+
     // --- Images ---
 
     pub fn insert_image(&mut self, id: u32, handle: Handle) {
@@ -154,6 +173,10 @@ impl PostStore {
         result
     }
 
+    pub fn get_image_path(&self, id: u32) -> PathBuf {
+        image_dir().join(format!("{id}.png"))
+    }
+
     // --- GIFs ---
 
     pub fn insert_gif(&mut self, id: u32, gif: Vec<u8>) {
@@ -164,6 +187,10 @@ impl PostStore {
         self.gifs.get(&id)
     }
 
+    pub fn get_gif_path(&self, id: u32) -> PathBuf {
+        gif_dir().join(format!("{id}.gif"))
+    }
+
     // --- Videos ---
 
     pub fn insert_video(&mut self, id: u32, url: Url) {
@@ -172,6 +199,10 @@ impl PostStore {
 
     pub fn get_video(&self, id: u32) -> Option<&Url> {
         self.videos.get(&id)
+    }
+
+    pub fn get_video_path(&self, id: u32) -> PathBuf {
+        video_dir().join(format!("{id}.webm"))
     }
 
     // --- Utilities ---
@@ -196,17 +227,81 @@ impl PostStore {
         self.videos.contains_key(&id)
     }
 
-    pub fn save(&self, path: &Path) -> Result<(), StoreError> {
-        let file = File::create(path)?;
-        let writer = BufWriter::new(file);
+    pub fn save_to(&self, path: &Path) -> Result<(), StoreError> {
+        let data = PostStoreData {
+            posts: self.posts.clone(),
+            thumbnails: self
+                .thumbnails
+                .keys()
+                .map(|&id| (id, self.get_thumbnail_path(id)))
+                .collect(),
+            images: self
+                .images
+                .keys()
+                .map(|&id| (id, self.get_image_path(id)))
+                .collect(),
+            gifs: self
+                .gifs
+                .keys()
+                .map(|&id| (id, self.get_gif_path(id)))
+                .collect(),
+            videos: self
+                .videos
+                .iter()
+                .map(|(&id, url)| (id, url.to_string()))
+                .collect(),
+            votes: self.votes.clone(),
+            favorites: self.favorites.clone(),
+        };
 
-        Ok(self.votes.serialize(&mut Serializer::new(writer))?)
+        if !path.exists() {
+            std::fs::create_dir_all(path.parent().unwrap())?;
+        }
+
+        let file = std::fs::File::create(path)?;
+        let writer = BufWriter::new(file);
+        data.serialize(&mut Serializer::new(writer))?;
+        Ok(())
     }
 
-    pub fn load(path: &Path) -> Result<Self, StoreError> {
-        let file = File::open(path)?;
+    pub fn load_from(path: &Path) -> Result<Self, StoreError> {
+        let file = std::fs::File::open(path)?;
         let reader = BufReader::new(file);
-        rmp_serde::decode::from_read(reader)?
+        let data: PostStoreData = rmp_serde::decode::from_read(reader)?;
+
+        let mut store = PostStore::new();
+        store.posts = data.posts;
+        store.votes = data.votes;
+        store.favorites = data.favorites;
+
+        for (id, path) in data.thumbnails {
+            if let Ok(bytes) = std::fs::read(path) {
+                store.insert_thumbnail(id, Handle::from_bytes(bytes));
+            }
+        }
+
+        for (id, path) in data.images {
+            if let Ok(bytes) = std::fs::read(&path) {
+                store.insert_image(id, Handle::from_bytes(bytes));
+            }
+        }
+
+        for (id, path) in data.gifs {
+            if let Ok(bytes) = std::fs::read(&path) {
+                store.insert_gif(id, bytes);
+            }
+        }
+
+        for (id, path) in data.videos {
+            if let Ok(url) = Url::from_str(&path) {
+                store.insert_video(id, url);
+            }
+        }
+
+        let post_count = store.posts.len();
+        info!("Loaded {post_count} posts");
+
+        Ok(store)
     }
 }
 

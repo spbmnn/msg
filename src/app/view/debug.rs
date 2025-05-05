@@ -17,8 +17,13 @@ pub fn render_debug_overlay(app: &App) -> Element<'_, Message> {
             "Thumbnail queue: {}",
             app.search.thumbnail_queue.len()
         )),
-        text(format!("Auth: {}", app.config.auth.is_some())),
     ];
+
+    if let Some(auth) = &app.config.auth {
+        debug_lines.push(text(format!("Auth: yes, as {}", auth.username)));
+    } else {
+        debug_lines.push(text("Auth: no"));
+    }
 
     if let Some(id) = app.selected_post {
         debug_lines.push(text(format!("Selected post: {}", id)));

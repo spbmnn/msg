@@ -37,7 +37,7 @@ pub fn render_followed(app: &App) -> Element<'_, Message> {
         }
         content = content.push(column![
             text(tag),
-            grid_view(&posts, images.as_slice(), max_columns as usize),
+            grid_view(&posts, images.as_slice(), max_columns as usize, false),
         ]);
     }
 

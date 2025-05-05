@@ -36,8 +36,8 @@ pub fn render_grid(app: &App) -> Element<'_, Message> {
     let tile_width = 180;
     let max_columns = (app.ui.window_width / tile_width.max(1)).max(1);
 
-    let content =
-        crate::gui::post_tile::grid_view(&app.posts, images.as_slice(), max_columns as usize);
+    let mut content =
+        crate::gui::post_tile::grid_view(&app.posts, images.as_slice(), max_columns as usize, true);
 
     column![
         search_bar,

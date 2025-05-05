@@ -4,7 +4,7 @@ use directories::ProjectDirs;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 pub fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("msg=debug"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("msg=trace"));
 
     let stdout_layer = fmt::layer().with_target(true);
 

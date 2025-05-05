@@ -62,11 +62,11 @@ pub async fn fetch_posts(
                 .await?
         }
     };
-    trace!("Raw response: {text}");
+    //trace!("Raw response: {text}");
     let res: PostsResponse = serde_json::from_str(&text)?;
     let length = &res.posts.len();
 
-    info!("Got {length} results for {tag}");
+    debug!("Got {length} results for {tag}");
     Ok(res.posts)
 }
 

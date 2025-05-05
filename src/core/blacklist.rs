@@ -1,9 +1,16 @@
 use super::model::Post;
+use serde::{Deserialize, Serialize};
+use tracing::debug;
 
-pub fn is_blacklisted(post: &Post, rules: &[String]) -> bool {
+#[derive(Debug, Deserialize, Default, Serialize, Clone)]
+pub struct Blacklist {
+    pub rules: Vec<String>,
+}
+
+pub fn is_blacklisted(post: &Post, blacklist: &Blacklist) -> bool {
     let tags = post.tags.iter().flat_map(|(_, t)| t).collect::<Vec<_>>();
 
-    'rule: for rule in rules {
+    'rule: for rule in &blacklist.rules {
         let tokens = rule.split_whitespace();
         for token in tokens {
             if token.starts_with("-") {
@@ -15,6 +22,8 @@ pub fn is_blacklisted(post: &Post, rules: &[String]) -> bool {
                 continue 'rule;
             }
         }
+        let post_id = post.id;
+        debug!("Filtered post {post_id} for rule {rule}");
         return true;
     }
 

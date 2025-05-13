@@ -59,7 +59,7 @@ fn render_media<'a>(
                     .padding(16)
                     .into()
             } else {
-                Text::new("Image not available").into()
+                Text::new("Image loading...").into()
             }
         }
         Some(crate::core::model::PostType::Gif) => {
@@ -69,7 +69,7 @@ fn render_media<'a>(
                     None => Text::new("Failed to parse GIF").into(),
                 }
             } else {
-                Text::new("GIF not available").into()
+                Text::new("Gif loading...").into()
             }
         }
         Some(crate::core::model::PostType::Video) => {
@@ -78,7 +78,7 @@ fn render_media<'a>(
                     .map(|msg| Message::Media(MediaMessage::VideoPlayerMsg(msg)))
                     .into()
             } else {
-                Text::new("Cannot load video").into()
+                Text::new("Video loading...").into()
             }
         }
         _ => Text::new("Unsupported type").into(),

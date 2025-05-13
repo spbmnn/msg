@@ -33,9 +33,12 @@ pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>) -> Element<'a, Messag
             .into()
     };
 
+    let ext = text(format!("{}", post.file.ext.clone().unwrap_or("".into()))).size(12);
+
     let meta = row![
         text(format!("score: {}", post.score.total)).size(12),
         rating_text,
+        ext,
     ]
     .spacing(8);
 

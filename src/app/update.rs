@@ -294,29 +294,13 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
     match msg {
         DetailMessage::AddTagToSearch(tag) => {
             app.selected_post = None;
+            app.ui.view_mode = ViewMode::Grid;
             app.search.query.push_str(&(" ".to_owned() + &tag));
             app.search.input = app.search.query.clone();
             app.loading = true;
-
-            let auth = app.config.auth.clone();
             let query = app.search.query.clone();
 
-            return Task::perform(
-                async move { fetch_posts(auth.as_ref(), query, None).await },
-                move |res| match res {
-                    Ok(posts) => {
-                        if posts.len() == 0 {
-                            Message::Tick
-                        } else {
-                            Message::Search(SearchMessage::PostsLoaded(posts))
-                        }
-                    }
-                    Err(err) => {
-                        error!("Couldn't load posts: {err}");
-                        Message::View(ViewMessage::ShowGrid)
-                    }
-                },
-            );
+            return Task::done(Message::Search(SearchMessage::LoadPosts(query)));
         }
         DetailMessage::NegateTagFromSearch(tag) => {
             app.selected_post = None;
@@ -324,25 +308,9 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
             app.search.input = app.search.query.clone();
             app.loading = true;
 
-            let auth = app.config.auth.clone();
             let query = app.search.query.clone();
 
-            return Task::perform(
-                async move { fetch_posts(auth.as_ref(), query, None).await },
-                move |res| match res {
-                    Ok(posts) => {
-                        if posts.len() == 0 {
-                            Message::Tick
-                        } else {
-                            Message::Search(SearchMessage::PostsLoaded(posts))
-                        }
-                    }
-                    Err(err) => {
-                        error!("Couldn't load posts: {err}");
-                        Message::View(ViewMessage::ShowGrid)
-                    }
-                },
-            );
+            return Task::done(Message::Search(SearchMessage::LoadPosts(query)));
         }
     }
 }

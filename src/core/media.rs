@@ -165,6 +165,7 @@ pub async fn fetch_video(id: u32, url: String, ext: String) -> Result<Url, Media
 }
 
 /// For building video/audio player.
+#[instrument]
 pub fn build_video_pipeline(uri: &str) -> Result<Video, anyhow::Error> {
     gst::init()?;
 
@@ -175,17 +176,7 @@ pub fn build_video_pipeline(uri: &str) -> Result<Video, anyhow::Error> {
         .build()?;
 
     let videoscale = gst::ElementFactory::make("videoscale").build()?;
-
-    pipeline.add(&videoscale)?;
-
-    let videoconvert = Arc::new(Mutex::new(
-        gst::ElementFactory::make("videoconvert")
-            .build()
-            .expect("Failed to create videoconvert"),
-    ));
-
-    let videoconvert_clone = videoconvert.clone();
-
+    let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
     let appsink_element = gst::ElementFactory::make("appsink")
         .name("iced_video")
         .build()?;
@@ -197,7 +188,6 @@ pub fn build_video_pipeline(uri: &str) -> Result<Video, anyhow::Error> {
 
     appsink.set_property("emit-signals", &true);
     appsink.set_property("sync", &true);
-    // Fallback caps: accept any raw video, log actual format on sample
     appsink.set_property(
         "caps",
         &gst::Caps::builder("video/x-raw")
@@ -205,40 +195,32 @@ pub fn build_video_pipeline(uri: &str) -> Result<Video, anyhow::Error> {
             .build(),
     );
 
-    let audioconvert = gst::ElementFactory::make("audioconvert")
-        .build()
-        .expect("Failed to create audioconvert");
-
-    let audioresample = gst::ElementFactory::make("audioresample")
-        .build()
-        .expect("Failed to create audioresample");
-
-    let audiosink = gst::ElementFactory::make("autoaudiosink")
-        .build()
-        .expect("Failed to create autoaudiosink");
+    let audioconvert = gst::ElementFactory::make("audioconvert").build()?;
+    let audioresample = gst::ElementFactory::make("audioresample").build()?;
+    let audiosink = gst::ElementFactory::make("autoaudiosink").build()?;
 
     pipeline.add_many(&[
         &src,
         &videoscale,
-        &*videoconvert.lock().unwrap(),
+        &videoconvert,
         &appsink_element,
         &audioconvert,
         &audioresample,
         &audiosink,
     ])?;
 
+    // Video pad linking
+    let videoconvert_clone = videoconvert.clone();
     src.connect_pad_added(move |_src, pad| {
-        let convert = videoconvert_clone.lock().unwrap();
-        let sink_pad = convert.static_pad("sink").unwrap();
+        let sink_pad = videoconvert_clone.static_pad("sink").unwrap();
         if !sink_pad.is_linked() {
             let _ = pad.link(&sink_pad);
         }
     });
 
-    gst::Element::link_many(&[&*videoconvert.lock().unwrap(), &appsink_element])?;
-    gst::Element::link_many(&[&audioconvert, &audioresample, &audiosink])?;
+    gst::Element::link_many(&[&videoconvert, &appsink_element])?;
 
-    // Link audio dynamically from uridecodebin too
+    // Audio pad linking
     let audioconvert_clone = audioconvert.clone();
     src.connect_pad_added(move |_src, pad| {
         if pad.current_caps().map_or(false, |caps| {
@@ -251,6 +233,8 @@ pub fn build_video_pipeline(uri: &str) -> Result<Video, anyhow::Error> {
             }
         }
     });
+
+    gst::Element::link_many(&[&audioconvert, &audioresample, &audiosink])?;
 
     let video = Video::from_gst_pipeline(pipeline, appsink, None)?;
     Ok(video)

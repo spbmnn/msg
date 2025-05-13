@@ -437,6 +437,7 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
         }
         ViewMessage::ShowGrid => {
             app.selected_post = None;
+            app.video_player = None;
             app.ui.view_mode = ViewMode::Grid;
         }
         ViewMessage::WindowResized(width, height) => {

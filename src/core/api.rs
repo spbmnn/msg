@@ -160,7 +160,7 @@ pub async fn favorite_post(auth: &Auth, id: u32) -> Result<(), ApiError> {
 
 #[instrument(skip(auth))]
 pub async fn unfavorite_post(auth: &Auth, id: u32) -> Result<(), ApiError> {
-    let url = format!("{BASE_URL}/favorites.json");
+    let url = format!("{BASE_URL}/favorites/{id}.json");
 
     trace!("DELETE {url}");
     let res = API_LIMITER

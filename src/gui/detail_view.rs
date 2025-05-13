@@ -159,17 +159,22 @@ fn vote_bar<'a>(post: &'a Post, store: &'a PostStore) -> Row<'a, Message> {
             }
         });
 
-    let fav_button = button("fav")
-        .on_press(Message::Post(PostMessage::Favorite(post.id)))
-        .style(move |theme: &Theme, _status| {
-            let palette = theme.extended_palette();
+    let fav_button = match is_favorited {
+        true => button("unfav")
+            .on_press(Message::Post(PostMessage::Favorite(post.id)))
+            .style(move |theme: &Theme, _status| {
+                let palette = theme.extended_palette();
 
-            if is_favorited {
-                button::Style::default().with_background(palette.primary.strong.color)
-            } else {
-                button::Style::default()
-            }
-        });
+                button::Style::default().with_background(palette.danger.strong.color)
+            }),
+        false => button("fav")
+            .on_press(Message::Post(PostMessage::Favorite(post.id)))
+            .style(move |theme: &Theme, _status| {
+                let palette = theme.extended_palette();
+
+                button::Style::default().with_background(palette.success.strong.color)
+            }),
+    };
 
     row![
         upvote_button,

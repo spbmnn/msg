@@ -1,7 +1,7 @@
 use crate::app::message::ViewMessage;
 
 use super::{App, Message};
-use iced::{event, window, Event, Subscription};
+use iced::{event, mouse, window, Event, Subscription};
 
 pub fn subscription(app: &App) -> Subscription<Message> {
     use iced::time;
@@ -14,6 +14,9 @@ pub fn subscription(app: &App) -> Subscription<Message> {
         Event::Window(window::Event::Resized(size)) => Some(Message::View(
             ViewMessage::WindowResized(size.width.floor() as u32, size.height.floor() as u32),
         )),
+        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Back)) => {
+            Some(Message::View(ViewMessage::ShowGrid))
+        }
         _ => None,
     }));
 

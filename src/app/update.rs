@@ -44,6 +44,7 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             app.selected_post = None;
             app.ui.view_mode = ViewMode::Grid;
             app.search.query = query.clone();
+            app.search.input = query.clone();
             let auth = app.config.auth.clone();
             return Task::perform(
                 async move { fetch_posts(auth.as_ref(), query.clone(), None).await },
@@ -352,7 +353,7 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
             app.settings.username = username;
         }
         SettingsMessage::ApiKeyChanged(key) => {
-            app.settings.username = key;
+            app.settings.api_key = key;
         }
         SettingsMessage::BlacklistEdited(action) => {
             app.settings.blacklist_content.perform(action);

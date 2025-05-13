@@ -7,7 +7,7 @@ use super::{state::ViewMode, App, Message};
 
 mod debug;
 mod detail;
-mod dtext;
+// mod dtext;
 mod followed;
 mod grid;
 mod settings;

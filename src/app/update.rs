@@ -1,11 +1,9 @@
-use std::fs;
-
 use crate::app::message::{
     DetailMessage, FollowedMessage, MediaMessage, Message, PostMessage, SearchMessage,
     SettingsMessage, StartupMessage, ViewMessage,
 };
 use crate::app::state::{App, ViewMode};
-use crate::core::api::{favorite_post, fetch_posts, unfavorite_post, vote_post};
+use crate::core::api::{favorite_post, fetch_comments, fetch_posts, unfavorite_post, vote_post};
 use crate::core::config::Auth;
 use crate::core::media::fetch_preview;
 use crate::core::media::{fetch_gif, fetch_image, fetch_video};
@@ -32,7 +30,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
     }
 }
 
-fn update_startup(app: &mut App, msg: StartupMessage) -> Task<Message> {
+fn update_startup(_app: &mut App, _msg: StartupMessage) -> Task<Message> {
     Task::none()
 }
 
@@ -136,8 +134,6 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
             let mut commands = vec![];
 
             if let Some(post) = app.store.get_post(id) {
-                let file = &post.file.ext;
-                // trace!("post file: {file:?}");
                 // TODO: Deal with .swfs for compatiblity.
                 // *Maaaaaaaybe* ruffle support? Doubt it.
                 match post.file.ext.as_deref() {
@@ -192,6 +188,16 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
                         }
                     }
                 }
+                commands.push(Task::perform(
+                    fetch_comments(None, id, None),
+                    move |res| match res {
+                        Ok(comments) => Message::Detail(DetailMessage::CommentsLoaded(comments)),
+                        Err(err) => {
+                            error!("Getting comments for {id} failed: {err}");
+                            Message::Tick
+                        }
+                    },
+                ));
             }
 
             return Task::batch(commands);
@@ -312,6 +318,11 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
 
             return Task::done(Message::Search(SearchMessage::LoadPosts(query)));
         }
+        DetailMessage::CommentsLoaded(comments) => {
+            app.store
+                .insert_comments(app.selected_post.unwrap(), comments);
+            Task::none()
+        }
     }
 }
 
@@ -354,6 +365,9 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
             }
 
             app.ui.view_mode = ViewMode::Grid;
+        }
+        SettingsMessage::PurgeCache => {
+            let _purge_result = app.store.purge();
         }
     }
     Task::none()
@@ -444,6 +458,15 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
             app.ui.window_width = width;
             app.ui.window_height = height;
         }
+        ViewMessage::Back => {
+            return match app.ui.view_mode {
+                ViewMode::Settings => Task::done(Message::Settings(SettingsMessage::Save)),
+                _ => Task::done(Message::View(ViewMessage::ShowGrid)),
+            }
+        }
+        ViewMessage::UpdateTheme(theme) => {
+            app.config.theme = theme;
+        }
     }
     Task::none()
 }
@@ -452,8 +475,6 @@ fn tick(app: &mut App) -> Task<Message> {
     if let Some(post_id) = app.search.thumbnail_queue.pop_front() {
         if let Some(post) = app.posts.iter().find(|p| p.id == post_id) {
             if let Some(url) = &post.preview.url {
-                let id = post.id;
-                //trace!("Fetching thumbnail for {id}");
                 return Task::perform(fetch_preview(post_id, url.clone()), move |res| match res {
                     Ok(thumb) => Message::Media(MediaMessage::ThumbnailLoaded(post_id, thumb)),
                     Err(err) => {

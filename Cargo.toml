@@ -14,7 +14,7 @@ futures = "0.3.31"
 glib = "0.20.9"
 gstreamer = "0.23.5"
 gstreamer-app = "0.23.5"
-iced = { version = "0.13.1", features = ["image", "tokio"] }
+iced = { version = "0.13.1", features = ["image", "tokio", "advanced"] }
 iced_aw = "0.12.2"
 iced_gif = { version = "0.13.0", features = ["tokio"] }
 iced_video_player = "0.6"

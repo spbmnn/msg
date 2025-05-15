@@ -8,4 +8,6 @@ pub use message::Message;
 pub use state::App;
 pub use subscription::subscription;
 pub use update::update;
+pub use view::theme;
+pub use view::title;
 pub use view::view;

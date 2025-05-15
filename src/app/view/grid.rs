@@ -2,13 +2,14 @@ use crate::app::message::{FollowedMessage, SearchMessage, ViewMessage};
 use crate::app::App;
 use crate::app::Message;
 use iced::widget::image::Handle;
+use iced::Alignment;
 use iced::{
     widget::{button, column, row, scrollable, text, text_input, Column, Row, Text},
     Element, Length,
 };
 
-pub fn render_grid(app: &App) -> Element<'_, Message> {
-    let search_bar = row![
+pub fn search_bar(app: &App) -> Row<'_, Message> {
+    row![
         text_input("search tags...", &app.search.input)
             .on_input(|input| Message::Search(SearchMessage::InputChanged(input)))
             .on_submit(Message::Search(SearchMessage::Submitted))
@@ -20,12 +21,13 @@ pub fn render_grid(app: &App) -> Element<'_, Message> {
         button("settings")
             .on_press(Message::View(ViewMessage::ShowSettings))
             .padding(8),
-        button("check")
+        button("followed")
             .on_press(Message::Followed(FollowedMessage::CheckUpdates))
             .padding(8)
     ]
-    .spacing(8);
+}
 
+pub fn render_grid(app: &App) -> Element<'_, Message> {
     let mut images: Vec<Option<&Handle>> = vec![];
 
     for post in &app.posts {
@@ -36,13 +38,8 @@ pub fn render_grid(app: &App) -> Element<'_, Message> {
     let tile_width = 180;
     let max_columns = (app.ui.window_width / tile_width.max(1)).max(1);
 
-    let mut content =
+    let content =
         crate::gui::post_tile::grid_view(&app.posts, images.as_slice(), max_columns as usize, true);
 
-    column![
-        search_bar,
-        scrollable(content.padding(16)).width(Length::Fill)
-    ]
-    .width(Length::Fill)
-    .into()
+    scrollable(content.padding(16)).into()
 }

@@ -2,19 +2,14 @@ use crate::app::Message;
 use crate::app::{message::*, App};
 use crate::gui::post_tile::grid_view;
 use iced::widget::image::Handle;
-use iced::Length;
 use iced::{
-    widget::{button, column, row, scrollable, text, text_input},
-    Element,
+    widget::{button, column, row, scrollable, text, Row},
+    Element, Length,
 };
-use tracing::debug;
 
-pub fn render_followed(app: &App) -> Element<'_, Message> {
-    let search_bar = row![
-        text("followed tags").size(16),
-        button("search")
-            .on_press(Message::Search(SearchMessage::Submitted))
-            .padding(8),
+pub fn followed_bar<'a>() -> Row<'a, Message> {
+    row![
+        text("Followed tags").size(20).width(Length::Fill),
         button("settings")
             .on_press(Message::View(ViewMessage::ShowSettings))
             .padding(8),
@@ -22,8 +17,9 @@ pub fn render_followed(app: &App) -> Element<'_, Message> {
             .on_press(Message::View(ViewMessage::ShowGrid))
             .padding(8)
     ]
-    .spacing(8);
+}
 
+pub fn render_followed(app: &App) -> Element<'_, Message> {
     let tile_width = 180;
     let max_columns = (app.ui.window_width / tile_width.max(1)).max(1);
 
@@ -41,10 +37,5 @@ pub fn render_followed(app: &App) -> Element<'_, Message> {
         ]);
     }
 
-    column![
-        search_bar,
-        scrollable(content.padding(16)).width(Length::Fill)
-    ]
-    .width(Length::Fill)
-    .into()
+    scrollable(content.padding(16).width(Length::Fill)).into()
 }

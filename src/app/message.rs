@@ -2,8 +2,8 @@ use iced::widget::image::Handle;
 use iced::widget::text_editor::Action;
 use url::Url;
 
-use crate::core::config::Config;
-use crate::core::model::{Post, Vote};
+use crate::core::config::{Config, MsgTheme};
+use crate::core::model::{Comment, Post, Vote};
 use crate::gui::video_player::VideoPlayerMessage;
 
 #[derive(Debug, Clone)]
@@ -63,6 +63,7 @@ pub enum MediaMessage {
 pub enum DetailMessage {
     AddTagToSearch(String),
     NegateTagFromSearch(String),
+    CommentsLoaded(Vec<Comment>),
 }
 
 /// Messages to manage settings menu state.
@@ -72,6 +73,7 @@ pub enum SettingsMessage {
     ApiKeyChanged(String),
     BlacklistEdited(Action),
     FollowFieldChanged(String),
+    PurgeCache,
     Save,
 }
 
@@ -91,4 +93,7 @@ pub enum ViewMessage {
     ShowSettings,
     ShowGrid,
     WindowResized(u32, u32),
+    /// For mouse back button, calls ShowGrid or Settings::Save accordingly
+    Back,
+    UpdateTheme(MsgTheme),
 }

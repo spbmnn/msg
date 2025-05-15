@@ -1,7 +1,7 @@
 use reqwest::Method;
 use serde::Deserialize;
 use thiserror::Error;
-use tracing::{debug, info, instrument, trace};
+use tracing::{debug, instrument, trace};
 
 use crate::core::http::authed_request;
 
@@ -9,8 +9,11 @@ use super::config::Auth;
 use super::http::CLIENT;
 use super::model::{Post, Vote};
 
+pub mod comments;
 pub mod rate_limiter;
 use rate_limiter::API_LIMITER;
+
+pub use comments::fetch_comments;
 
 const BASE_URL: &str = "https://e621.net";
 

@@ -139,3 +139,14 @@ pub enum Vote {
     Upvote = 1,
     Downvote = -1,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Comment {
+    pub id: u32,
+    pub post_id: u32,
+    pub creator_name: String,
+    pub body: String,
+    pub score: i32,
+    pub created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}

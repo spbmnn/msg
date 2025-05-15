@@ -1,48 +1,43 @@
-use iced::theme::Palette;
+use chrono::{prelude::*, TimeDelta};
+
+use iced::font::Weight;
+use iced::widget::text::Shaping;
 use iced::widget::{button, column, container, image, row, scrollable, text};
 use iced::widget::{Column, Row, Text};
 use iced::{Alignment, Element, Length, Theme};
-use iced_gif::{Frames, Gif};
-use iced_video_player::VideoPlayer;
-use tracing::error;
+use iced_gif::Gif;
 
 use crate::app::message::PostMessage;
-use crate::core::model::Vote;
+use crate::core::model::{Comment, Vote};
 use crate::{
-    app::message::{DetailMessage, FollowedMessage, MediaMessage, SearchMessage, ViewMessage},
+    app::message::{DetailMessage, FollowedMessage, MediaMessage, SearchMessage},
     app::Message,
-    core::{
-        model::{Post, Rating},
-        store::PostStore,
-    },
+    core::{model::Post, store::PostStore},
 };
 
-use super::video_player::{VideoPlayerMessage, VideoPlayerWidget};
+use super::time_ago::relative_time_ago;
+use super::video_player::VideoPlayerWidget;
 
 pub fn render_detail<'a>(
     post: &'a Post,
     store: &'a PostStore,
     video_player: &'a Option<VideoPlayerWidget>,
 ) -> Element<'a, Message> {
-    let media_panel = column![
-        button("back").on_press(Message::View(ViewMessage::ShowGrid)),
-        text(format!("post #{}", post.id)),
-        text(match post.rating {
-            Rating::Safe => "Rating: Safe",
-            Rating::Questionable => "Rating: Questionable",
-            Rating::Explicit => "Rating: Explicit",
-        }),
-        text(format!("score: {}", post.score.total)),
+    let mut media_panel = column![
         render_media(post, store, video_player),
         vote_bar(post, store),
-        text(post.description.clone()),
+        text(post.description.clone()).shaping(Shaping::Advanced),
     ];
+
+    if let Some(comments) = store.get_comments(post.id) {
+        media_panel = media_panel.push(render_comments(&comments));
+    }
 
     let info_panel = info_panel(&post);
 
     row![
-        scrollable(media_panel.width(Length::FillPortion(9))),
-        scrollable(info_panel.width(Length::FillPortion(3)))
+        scrollable(media_panel.width(Length::FillPortion(9)).padding(16)),
+        scrollable(info_panel.width(Length::FillPortion(3)).padding(16))
     ]
     .into()
 }
@@ -55,9 +50,7 @@ fn render_media<'a>(
     match post.get_type() {
         Some(crate::core::model::PostType::Image) => {
             if let Some(img) = store.get_image(post.id) {
-                container(image(img).width(Length::Shrink).height(Length::Shrink))
-                    .padding(16)
-                    .into()
+                container(image(img).width(Length::Shrink).height(Length::Shrink)).into()
             } else {
                 Text::new("Image loading...").into()
             }
@@ -124,11 +117,40 @@ fn render_tag(tag: &String) -> Element<'_, Message> {
     .into()
 }
 
+fn render_comments<'a>(comments: &'a [Comment]) -> Column<'a, Message> {
+    let all_comments = column(
+        comments
+            .iter()
+            .map(|comment| render_comment(comment))
+            .collect::<Vec<_>>(),
+    );
+
+    all_comments.spacing(10)
+}
+
+fn render_comment<'a>(comment: &'a Comment) -> Element<'a, Message> {
+    let created_at: DateTime<Local> = DateTime::from(comment.created_at);
+    let time_ago: TimeDelta = Local::now() - created_at;
+
+    container(column![
+        text(comment.creator_name.clone()).font(iced::font::Font {
+            weight: Weight::Bold,
+            ..Default::default()
+        }),
+        text(comment.body.clone()).shaping(Shaping::Advanced),
+        text(relative_time_ago(time_ago)).size(10)
+    ])
+    .width(Length::Fill)
+    .style(container::bordered_box)
+    .padding(8)
+    .into()
+}
+
 fn vote_bar<'a>(post: &'a Post, store: &'a PostStore) -> Row<'a, Message> {
     let vote_status = store.vote_for(post.id);
     let is_favorited = store.is_favorited(post.id);
 
-    let upvote_button = button("↑")
+    let upvote_button = button(text("↑").shaping(Shaping::Advanced))
         .on_press(match vote_status {
             Some(Vote::Upvote) => Message::Post(PostMessage::Vote(post.id, None)),
             _ => Message::Post(PostMessage::Vote(post.id, Some(Vote::Upvote))),
@@ -143,7 +165,7 @@ fn vote_bar<'a>(post: &'a Post, store: &'a PostStore) -> Row<'a, Message> {
                 _ => button::Style::default(),
             }
         });
-    let downvote_button = button("↓")
+    let downvote_button = button(text("↓").shaping(Shaping::Advanced))
         .on_press(match vote_status {
             Some(Vote::Downvote) => Message::Post(PostMessage::Vote(post.id, None)),
             _ => Message::Post(PostMessage::Vote(post.id, Some(Vote::Downvote))),
@@ -182,5 +204,6 @@ fn vote_bar<'a>(post: &'a Post, store: &'a PostStore) -> Row<'a, Message> {
         downvote_button,
         fav_button
     ]
+    .align_y(Alignment::Center)
     .spacing(12)
 }

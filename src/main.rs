@@ -4,6 +4,7 @@ mod gui;
 mod util;
 
 use app::App;
+use iced::theme;
 use tracing::{error, info};
 
 fn main() -> iced::Result {
@@ -17,7 +18,8 @@ fn main() -> iced::Result {
         std::process::exit(1);
     }
 
-    iced::application("MSG", app::update, app::view)
+    iced::application(app::title, app::update, app::view)
+        .theme(app::theme)
         .exit_on_close_request(false)
         .subscription(app::subscription)
         .run_with(App::new)

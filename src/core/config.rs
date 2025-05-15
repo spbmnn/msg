@@ -1,5 +1,6 @@
 use core::fmt;
 use directories::ProjectDirs;
+use iced::Theme;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use thiserror::Error;
@@ -24,11 +25,39 @@ pub enum ConfigError {
     TomlSerError(#[from] toml::ser::Error),
 }
 
+#[derive(Serialize, Deserialize, Default, Clone, Debug, Eq, PartialEq)]
+pub enum MsgTheme {
+    Light,
+    #[default]
+    Dark,
+}
+
+impl MsgTheme {
+    pub fn get(&self) -> Theme {
+        match self {
+            MsgTheme::Dark => Theme::Dark,
+            MsgTheme::Light => Theme::Light,
+        }
+    }
+}
+
+impl ToString for MsgTheme {
+    fn to_string(&self) -> String {
+        match self {
+            MsgTheme::Dark => "Dark",
+            MsgTheme::Light => "Light",
+        }
+        .to_string()
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct Config {
     pub auth: Option<Auth>,
     pub blacklist: Blacklist,
     pub followed_tags: Vec<FollowedTag>,
+    #[serde(default)]
+    pub theme: MsgTheme,
 }
 
 #[derive(Deserialize, Default, Serialize, Clone)]

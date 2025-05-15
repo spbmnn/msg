@@ -1,7 +1,8 @@
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     fs::File,
-    io::{BufReader, BufWriter, Read, Write},
+    io::{BufReader, BufWriter},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -12,12 +13,12 @@ use iced_gif::Frames;
 use rmp_serde::Serializer;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::{debug, info, trace};
+use tracing::{info, trace, warn};
 use url::Url;
 
 use super::{
-    media::{gif_dir, image_dir, thumbnail_dir, video_dir},
-    model::{Post, Vote},
+    media::{gif_dir, image_dir, thumbnail_dir},
+    model::{Comment, Post, Vote},
 };
 
 #[derive(Debug, Error)]
@@ -38,25 +39,47 @@ pub enum StoreError {
 /// Stores media for posts.
 #[derive(Debug, Default)]
 pub struct PostStore {
+    /// List of [`Post`]s.
     pub posts: HashMap<u32, Post>,
+    /// Post thumbnails, stored as [Handle]s of image data.
     pub thumbnails: HashMap<u32, Handle>,
+    /// Post images, stored as [Handle]s of image data.
     pub images: HashMap<u32, Handle>,
+    /// Post GIFs, stored as raw bytes.
     pub gifs: HashMap<u32, Vec<u8>>,
+    /// Post GIFs, stored as [Frames].
     pub gif_frames: HashMap<u32, Frames>,
+    /// Post videos, stored as the location on disk (as a [`Url`]).
     pub videos: HashMap<u32, Url>,
 
+    /// Stored votes.
+    /// Note that the e6 API has no way to see previous votes your account has made, so these are only votes made within MSG.
     pub votes: HashMap<u32, Vote>,
+    /// List of posts (by ID) that have been favorited.
     pub favorites: HashSet<u32>,
+
+    /// Stored comments. Currently not kept across sessions.
+    pub comments: HashMap<u32, Vec<Comment>>,
 }
 
+/// Used for serializing [`PostStore`]s.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PostStoreData {
+    /// List of [`Post`]s.
     pub posts: HashMap<u32, Post>,
+    /// List of paths to thumbnail images stored on disk.
     pub thumbnails: HashMap<u32, PathBuf>,
+    /// List of paths to post images stored on disk.
     pub images: HashMap<u32, PathBuf>,
+    /// List of paths to GIFs stored on disk.
     pub gifs: HashMap<u32, PathBuf>,
+    /// List of paths to videos stored on disk.
+    /// TODO: Make this PathBuf like the rest.
     pub videos: HashMap<u32, String>,
+    /// Stored votes.
+    /// Note that the e6 API has no way to see previous votes your account has made, so these are only votes made within MSG.
     pub votes: HashMap<u32, Vote>,
+    /// List of posts (by ID) that have been favorited.
     pub favorites: HashSet<u32>,
 }
 
@@ -71,6 +94,7 @@ impl PostStore {
             gif_frames: HashMap::new(),
             videos: HashMap::new(),
             favorites: HashSet::new(),
+            comments: HashMap::new(),
         }
     }
 
@@ -92,6 +116,23 @@ impl PostStore {
 
     pub fn all_posts(&self) -> impl Iterator<Item = &Post> {
         self.posts.values()
+    }
+
+    // --- Comments ---
+    pub fn insert_comments(&mut self, id: u32, comments: impl IntoIterator<Item = Comment>) {
+        if !self.comments.contains_key(&id) {
+            self.comments.insert(id, Vec::new());
+        }
+        for comment in comments {
+            self.comments
+                .get_mut(&comment.post_id)
+                .unwrap()
+                .push(comment);
+        }
+    }
+
+    pub fn get_comments(&self, id: u32) -> Option<&Vec<Comment>> {
+        self.comments.get(&id)
     }
 
     // --- Votes ---
@@ -201,10 +242,6 @@ impl PostStore {
         self.videos.get(&id)
     }
 
-    pub fn get_video_path(&self, id: u32) -> PathBuf {
-        video_dir().join(format!("{id}.webm"))
-    }
-
     // --- Utilities ---
 
     pub fn clear(&mut self) {
@@ -302,6 +339,64 @@ impl PostStore {
         info!("Loaded {post_count} posts");
 
         Ok(store)
+    }
+
+    /// Removes all non-favorited posts from storage.
+    pub fn purge(&mut self) -> Result<usize, StoreError> {
+        warn!("PURGE INITIATED!");
+
+        let mut new_images = self.images.clone();
+        let mut new_gifs = self.gifs.clone();
+        let mut new_videos = self.videos.clone();
+
+        // capture original lengths of all arrays
+        let mut post_count = self.posts.len();
+        let mut image_count = self.images.len();
+        let mut gif_count = self.gifs.len();
+        let mut video_count = self.videos.len();
+
+        // to prevent borrow-checker shenanigans
+        let favorites = self.favorites.clone();
+
+        self.posts.retain(|id, _post| favorites.contains(id));
+        post_count -= self.posts.len();
+        info!("Removed {post_count} posts");
+
+        for id in self.images.keys() {
+            if !favorites.contains(&id) {
+                let path = self.get_image_path(*id);
+                fs::remove_file(&path)?;
+                trace!("Removed {path:?}");
+                new_images.remove(id);
+            }
+        }
+        image_count -= new_images.len();
+        info!("Removed {image_count} images");
+
+        for id in self.gifs.keys() {
+            if !favorites.contains(&id) {
+                let path = self.get_gif_path(*id);
+                fs::remove_file(&path)?;
+                trace!("Removed {path:?}");
+                new_gifs.remove(id);
+                self.gif_frames.remove(id);
+            }
+        }
+        gif_count -= new_gifs.len();
+        info!("Removed {gif_count} gifs");
+
+        for (id, url) in &self.videos {
+            if !favorites.contains(&id) {
+                let path = url.path();
+                fs::remove_file(&path)?;
+                trace!("Removed {path:?}");
+                new_videos.remove(id);
+            }
+        }
+        video_count -= new_videos.len();
+        info!("Removed {video_count} videos");
+
+        Ok(post_count)
     }
 }
 

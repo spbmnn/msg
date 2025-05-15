@@ -1,6 +1,6 @@
 use iced::{
     widget::{column, container, text},
-    Color, Element, Length,
+    Element, Length,
 };
 
 use crate::app::{App, Message};

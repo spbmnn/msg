@@ -15,6 +15,9 @@ pub fn search_bar(app: &App) -> Row<'_, Message> {
             .on_submit(Message::Search(SearchMessage::Submitted))
             .padding(8)
             .size(16),
+        button("favorites")
+            .on_press(Message::Search(SearchMessage::GetFavorites))
+            .padding(8),
         button("search")
             .on_press(Message::Search(SearchMessage::Submitted))
             .padding(8),

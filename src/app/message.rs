@@ -36,6 +36,7 @@ pub enum SearchMessage {
     PostsLoaded(Vec<Post>),
     InputChanged(String),
     Submitted,
+    GetFavorites,
 }
 
 /// Manages post loading

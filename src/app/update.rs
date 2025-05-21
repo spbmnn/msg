@@ -119,6 +119,14 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
                 );
             }
         }
+        SearchMessage::GetFavorites => {
+            if app.config.auth.is_none() {
+                return Task::none();
+            }
+            let query = format!("fav:{}", app.config.auth.as_ref().unwrap().username);
+
+            return Task::done(Message::Search(SearchMessage::LoadPosts(query)));
+        }
     }
     Task::none()
 }

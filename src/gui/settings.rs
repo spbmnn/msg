@@ -1,3 +1,4 @@
+use byte_unit::{Byte, Unit, UnitType};
 use iced::{
     widget::{
         button, button::danger, column, container, pick_list, row, scrollable, text, text_editor,
@@ -11,7 +12,7 @@ use crate::{
         message::{FollowedMessage, SettingsMessage, ViewMessage},
         Message,
     },
-    core::{config::MsgTheme, model::FollowedTag, store::PostStore},
+    core::{config::MsgTheme, media::cache_dir, model::FollowedTag, store::PostStore},
 };
 
 pub fn render_settings<'a>(
@@ -54,7 +55,18 @@ pub fn render_settings<'a>(
 }
 
 fn cache_info<'a>(cache: &'a PostStore) -> Element<'a, Message> {
+    let cache_size_bytes = fs_extra::dir::get_size(cache_dir());
+
+    let cache_size_text = match cache_size_bytes {
+        Ok(size) => format!(
+            "{:.2}",
+            Byte::from_u64(size).get_appropriate_unit(UnitType::Binary)
+        ),
+        Err(_) => "unknown".to_string(),
+    };
+
     let info_lines = column![
+        text(format!("Cache size: {}", cache_size_text)),
         text(format!("Posts stored: {}", cache.posts.len())),
         text(format!("Thumbnails cached: {}", cache.thumbnails.len())),
         text(format!("Images cached: {}", cache.images.len())),

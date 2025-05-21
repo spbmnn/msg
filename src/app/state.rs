@@ -82,8 +82,8 @@ impl App {
         debug!("creating new Msg");
 
         let search = SearchState {
-            input: "fav:homogoat".into(),
-            query: "fav:homogoat".into(),
+            input: "order:rank".into(),
+            query: "order:rank".into(),
             thumbnail_queue: VecDeque::new(),
         };
 

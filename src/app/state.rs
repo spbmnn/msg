@@ -111,7 +111,7 @@ impl App {
         };
 
         let cmd = Task::perform(
-            fetch_posts(None, String::from("fav:homogoat"), None), // should fix
+            fetch_posts(None, String::from("order:rank"), None), // should fix
             move |res| match res {
                 Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
                 Err(err) => {

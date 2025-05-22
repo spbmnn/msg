@@ -1,6 +1,6 @@
 use crate::app::message::{
     DetailMessage, FollowedMessage, MediaMessage, Message, PostMessage, SearchMessage,
-    SettingsMessage, StartupMessage, ViewMessage,
+    SettingsMessage, ViewMessage,
 };
 use crate::app::state::{App, ViewMode};
 use crate::core::api::{favorite_post, fetch_comments, fetch_posts, unfavorite_post, vote_post};
@@ -17,7 +17,6 @@ use tracing::{debug, error, info, instrument, trace, warn};
 #[instrument(skip_all)]
 pub fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
-        Message::Startup(msg) => update_startup(app, msg),
         Message::Search(msg) => update_search(app, msg),
         Message::Post(msg) => update_post(app, msg),
         Message::Media(msg) => update_media(app, msg),
@@ -28,10 +27,6 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
         Message::Tick => tick(app),
         Message::Exit => exit(app),
     }
-}
-
-fn update_startup(_app: &mut App, _msg: StartupMessage) -> Task<Message> {
-    Task::none()
 }
 
 fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {

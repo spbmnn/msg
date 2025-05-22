@@ -2,15 +2,13 @@ use iced::widget::image::Handle;
 use iced::widget::text_editor::Action;
 use url::Url;
 
-use crate::core::config::{Config, MsgTheme};
+use crate::core::config::MsgTheme;
 use crate::core::model::{Comment, Post, Vote};
 use crate::gui::video_player::VideoPlayerMessage;
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Tick,
-
-    Startup(StartupMessage),
     Search(SearchMessage),
     Post(PostMessage),
     Media(MediaMessage),
@@ -20,12 +18,6 @@ pub enum Message {
     View(ViewMessage),
 
     Exit,
-}
-
-/// Messages to manage startup state
-#[derive(Debug, Clone)]
-pub enum StartupMessage {
-    Loaded(Config),
 }
 
 /// Messages to manage the search state

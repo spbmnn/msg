@@ -138,7 +138,7 @@ impl Default for App {
         let followed_tags = config.followed_tags.clone();
         let blacklist = config.blacklist.rules.join("\n").clone();
 
-        let mut store = PostStore::new();
+        let store = PostStore::new();
 
         //let vote_path = data_dir().join("votes.mpk");
         //store.load_votes_from(&vote_path).unwrap_or_default();

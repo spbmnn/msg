@@ -1,23 +1,20 @@
-use std::cell::RefCell;
-use std::io::{Cursor, Write};
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::io::Cursor;
+use std::path::PathBuf;
 
 use directories::ProjectDirs;
 use gstreamer::glib::object::{Cast, ObjectExt};
 use gstreamer::prelude::*;
-use gstreamer::{self as gst, FlowReturn};
-use gstreamer_app::{self as gst_app, AppSink};
+use gstreamer::{self as gst};
+use gstreamer_app::AppSink;
 use iced::widget::image::Handle;
 use iced_video_player::Video;
 use image::DynamicImage;
 use thiserror::Error;
-use tracing::{debug, info, instrument, trace, warn};
+use tracing::{debug, instrument, trace, warn};
 use url::Url;
 
 use super::http::CLIENT;
-use super::model::{File, Post};
+use super::model::File;
 
 const SIZE: u32 = 4096; // Textures larger than 4096x4096 tend to crash wgpu
 
@@ -26,9 +23,8 @@ pub enum MediaError {
     #[error("Missing preview URL")]
     MissingUrl,
 
-    #[error("Couldn't convert path to URL")]
-    UrlConvertError,
-
+    //#[error("Couldn't convert path to URL")]
+    //UrlConvertError,
     #[error("Encoding error")]
     EncodingFailed,
 
@@ -44,9 +40,8 @@ pub enum MediaError {
     #[error("Gif error: {0}")]
     GifError(#[from] iced_gif::gif::Error),
 
-    #[error("Pipeline media error")]
-    PipelineTypeError,
-
+    //#[error("Pipeline media error")]
+    //PipelineTypeError,
     #[error("Pipeline error: {0}")]
     BoolError(#[from] gst::glib::BoolError),
 
@@ -257,8 +252,4 @@ pub fn image_dir() -> PathBuf {
 
 pub fn gif_dir() -> PathBuf {
     cache_dir().join("gifs")
-}
-
-pub fn video_dir() -> PathBuf {
-    cache_dir().join("video")
 }

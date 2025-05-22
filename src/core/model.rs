@@ -4,7 +4,7 @@
 //! [e621 OpenAPI spec]: https://e621.wiki/
 
 use chrono::{DateTime, Utc};
-use serde::{de::Visitor, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::{self};
 
 /// Represents a post on e621.

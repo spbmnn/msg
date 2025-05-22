@@ -4,7 +4,6 @@ mod gui;
 mod util;
 
 use app::App;
-use iced::theme;
 use tracing::{error, info};
 
 fn main() -> iced::Result {

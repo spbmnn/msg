@@ -2,10 +2,9 @@ use crate::app::message::{FollowedMessage, SearchMessage, ViewMessage};
 use crate::app::App;
 use crate::app::Message;
 use iced::widget::image::Handle;
-use iced::Alignment;
 use iced::{
-    widget::{button, column, row, scrollable, text, text_input, Column, Row, Text},
-    Element, Length,
+    widget::{button, row, scrollable, text_input, Row},
+    Element,
 };
 
 pub fn search_bar(app: &App) -> Row<'_, Message> {

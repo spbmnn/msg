@@ -1,4 +1,4 @@
-use byte_unit::{Byte, Unit, UnitType};
+use byte_unit::{Byte, UnitType};
 use iced::{
     widget::{
         button, button::danger, column, container, pick_list, row, scrollable, text, text_editor,

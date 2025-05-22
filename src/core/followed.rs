@@ -1,11 +1,6 @@
-use std::time::Duration;
-
 use crate::core::api;
 use crate::core::config::Auth;
 use crate::core::model::{FollowedTag, Post};
-
-use iced::futures::stream::{self, StreamExt};
-use tokio::time::sleep;
 use tracing::{instrument, warn};
 
 #[instrument(skip(auth))]

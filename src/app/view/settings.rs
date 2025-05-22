@@ -6,7 +6,7 @@ use iced::{
     Element, Length,
 };
 
-pub fn settings_bar(app: &App) -> Row<'_, Message> {
+pub fn settings_bar(_app: &App) -> Row<'_, Message> {
     row![
         text("Settings").size(20).width(Length::Fill),
         button("save").on_press(Message::Settings(SettingsMessage::Save)),

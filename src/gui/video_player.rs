@@ -33,7 +33,7 @@ impl fmt::Debug for VideoPlayerWidget {
 #[derive(Debug, Clone)]
 pub enum VideoPlayerMessage {
     TogglePause,
-    ToggleLoop,
+    //ToggleLoop,
     Seek(f64),
     SeekRelease,
     EndOfStream,
@@ -56,9 +56,9 @@ impl VideoPlayerWidget {
                 self.video.set_paused(!self.video.paused());
                 self.playing = !self.video.paused();
             }
-            VideoPlayerMessage::ToggleLoop => {
-                self.video.set_looping(!self.video.looping());
-            }
+            //VideoPlayerMessage::ToggleLoop => {
+            //    self.video.set_looping(!self.video.looping());
+            //}
             VideoPlayerMessage::Seek(time) => {
                 self.dragging_cursor = true;
                 self.video.set_paused(true);

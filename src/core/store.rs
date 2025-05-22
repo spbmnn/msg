@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    fs::File,
     io::{BufReader, BufWriter},
     path::{Path, PathBuf},
     str::FromStr,
@@ -32,9 +31,8 @@ pub enum StoreError {
 
     #[error("RMP decoding error: {0}")]
     RmpDecodeError(#[from] rmp_serde::decode::Error),
-
-    #[error("Voting error: {0}")]
-    VoteError(String),
+    //#[error("Voting error: {0}")]
+    //VoteError(String),
 }
 
 /// Stores media for posts.
@@ -113,10 +111,6 @@ impl PostStore {
 
     pub fn get_post(&self, id: u32) -> Option<&Post> {
         self.posts.get(&id)
-    }
-
-    pub fn all_posts(&self) -> impl Iterator<Item = &Post> {
-        self.posts.values()
     }
 
     // --- Comments ---
@@ -230,14 +224,6 @@ impl PostStore {
     }
 
     // --- Utilities ---
-
-    pub fn clear(&mut self) {
-        self.posts.clear();
-        self.thumbnails.clear();
-        self.images.clear();
-        self.gifs.clear();
-        self.videos.clear();
-    }
 
     pub fn has_image(&self, id: u32) -> bool {
         self.images.contains_key(&id)

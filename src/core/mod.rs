@@ -1,7 +1,6 @@
 pub mod api;
 pub mod blacklist;
 pub mod config;
-pub mod dtext;
 pub mod followed;
 pub mod http;
 pub mod media;

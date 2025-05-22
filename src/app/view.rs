@@ -1,13 +1,11 @@
 use iced::{
-    widget::{column, row, scrollable, text, Row, Space},
-    Alignment, Element, Length, Renderer, Theme,
+    widget::{column, Row},
+    Alignment, Element, Length, Theme,
 };
-
-use crate::core::config::MsgTheme;
 
 use super::{state::ViewMode, App, Message};
 
-mod debug;
+// mod debug;
 mod detail;
 // mod dtext;
 mod followed;

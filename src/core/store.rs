@@ -12,6 +12,7 @@ use iced::widget::image::Handle;
 use iced_gif::Frames;
 use rmp_serde::Serializer;
 use serde::{Deserialize, Serialize};
+use serde_flow::Flow;
 use thiserror::Error;
 use tracing::{info, trace, warn};
 use url::Url;
@@ -63,7 +64,7 @@ pub struct PostStore {
 }
 
 /// Used for serializing [`PostStore`]s.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Flow)]
 pub struct PostStoreData {
     /// List of [`Post`]s.
     pub posts: HashMap<u32, Post>,
@@ -78,7 +79,7 @@ pub struct PostStoreData {
     pub videos: HashMap<u32, String>,
     /// Stored votes.
     /// Note that the e6 API has no way to see previous votes your account has made, so these are only votes made within MSG.
-    pub votes: HashMap<u32, Vote>,
+    pub votes: HashMap<u32, bool>,
     /// List of posts (by ID) that have been favorited.
     pub favorites: HashSet<u32>,
 }
@@ -151,20 +152,6 @@ impl PostStore {
     /// Get the user's vote for a given post.
     pub fn vote_for(&self, post_id: u32) -> Option<Vote> {
         self.votes.get(&post_id).copied()
-    }
-
-    pub fn save_votes_to(&self, path: &Path) -> Result<(), StoreError> {
-        let file = File::create(path)?;
-        let writer = BufWriter::new(file);
-
-        Ok(self.votes.serialize(&mut Serializer::new(writer))?)
-    }
-
-    pub fn load_votes_from(&mut self, path: &Path) -> Result<(), StoreError> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        self.votes = rmp_serde::decode::from_read(reader)?;
-        Ok(())
     }
 
     // --- Favorites ---
@@ -287,7 +274,11 @@ impl PostStore {
                 .iter()
                 .map(|(&id, url)| (id, url.to_string()))
                 .collect(),
-            votes: self.votes.clone(),
+            votes: self
+                .votes
+                .iter()
+                .map(|(&id, &vote)| (id, vote.into()))
+                .collect(),
             favorites: self.favorites.clone(),
         };
 
@@ -308,8 +299,11 @@ impl PostStore {
 
         let mut store = PostStore::new();
         store.posts = data.posts;
-        store.votes = data.votes;
         store.favorites = data.favorites;
+
+        for (id, upvoted) in data.votes {
+            store.set_vote(id, Some(Vote::from(upvoted)));
+        }
 
         for (id, path) in data.thumbnails {
             if let Ok(bytes) = std::fs::read(path) {

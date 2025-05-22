@@ -407,6 +407,15 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "bincode"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
@@ -931,6 +940,21 @@ checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "crc"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9710d3b3739c2e349eb44fe848ad0b7c8cb1e42bd87ee49371df2f7acaf3e675"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
 
 [[package]]
 name = "crc32fast"
@@ -2995,7 +3019,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
- "bincode",
+ "bincode 2.0.1",
  "byte-unit",
  "chrono",
  "directories",
@@ -3014,6 +3038,7 @@ dependencies = [
  "reqwest",
  "rmp-serde",
  "serde",
+ "serde_flow",
  "serde_json",
  "tempfile",
  "thiserror 2.0.12",
@@ -4621,6 +4646,33 @@ checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
 dependencies = [
  "proc-macro2",
  "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "serde_flow"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81a8cb3a17c770f98d417fb92599b39c89bf0ed22eb6a3b9dfd6305cb9bdaadd"
+dependencies = [
+ "bincode 1.3.3",
+ "crc",
+ "futures-util",
+ "serde",
+ "serde_flow_derive",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "serde_flow_derive"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d4c8f8b9a07a3753eaa691fe74598f19050a7672643f425b729813ba33011d3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde",
  "syn 2.0.100",
 ]
 

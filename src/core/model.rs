@@ -4,7 +4,7 @@
 //! [e621 OpenAPI spec]: https://e621.wiki/
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Serialize};
 use std::fmt::{self};
 
 /// Represents a post on e621.
@@ -134,10 +134,29 @@ impl Post {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Vote {
     Upvote = 1,
     Downvote = -1,
+}
+
+impl From<Vote> for bool {
+    fn from(value: Vote) -> Self {
+        match value {
+            Vote::Upvote => true,
+            Vote::Downvote => false,
+        }
+    }
+}
+
+impl From<bool> for Vote {
+    fn from(value: bool) -> Self {
+        if value {
+            Vote::Upvote
+        } else {
+            Vote::Downvote
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

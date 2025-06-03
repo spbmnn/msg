@@ -2,6 +2,7 @@ use core::fmt;
 use directories::ProjectDirs;
 use iced::Theme;
 use serde::{Deserialize, Serialize};
+use serde_flow::Flow;
 use std::{fs, path::PathBuf};
 use thiserror::Error;
 use tracing::info;
@@ -51,7 +52,8 @@ impl ToString for MsgTheme {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, Flow)]
+#[flow(variant = 1)]
 pub struct Config {
     pub auth: Option<Auth>,
     pub blacklist: Blacklist,

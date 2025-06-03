@@ -63,6 +63,7 @@ pub struct PostStore {
 
 /// Used for serializing [`PostStore`]s.
 #[derive(Debug, Default, Serialize, Deserialize, Flow)]
+#[flow(variant = 1)]
 pub struct PostStoreData {
     /// List of [`Post`]s.
     pub posts: HashMap<u32, Post>,

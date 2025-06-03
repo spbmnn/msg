@@ -322,8 +322,7 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
             return Task::done(Message::Search(SearchMessage::LoadPosts(query)));
         }
         DetailMessage::CommentsLoaded(comments) => {
-            app.store
-                .insert_comments(app.selected_post.unwrap(), comments);
+            app.store.insert_comments(comments);
             Task::none()
         }
     }

@@ -101,12 +101,13 @@ impl PostStore {
     // --- Posts ---
 
     pub fn insert_post(&mut self, post: Post) {
+        self.set_favorite(post.id, post.is_favorited);
         self.posts.insert(post.id, post);
     }
 
     pub fn insert_posts(&mut self, posts: impl IntoIterator<Item = Post>) {
         for post in posts {
-            self.posts.insert(post.id, post);
+            self.insert_post(post);
         }
     }
 
@@ -115,14 +116,11 @@ impl PostStore {
     }
 
     // --- Comments ---
-    pub fn insert_comments(&mut self, id: u32, comments: impl IntoIterator<Item = Comment>) {
-        if !self.comments.contains_key(&id) {
-            self.comments.insert(id, Vec::new());
-        }
+    pub fn insert_comments(&mut self, comments: impl IntoIterator<Item = Comment>) {
         for comment in comments {
             self.comments
-                .get_mut(&comment.post_id)
-                .unwrap()
+                .entry(comment.post_id)
+                .or_insert(Vec::new())
                 .push(comment);
         }
     }

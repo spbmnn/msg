@@ -45,9 +45,9 @@ pub async fn fetch_comments(
         }
     };
 
-    let res: Vec<Comment> = serde_json::from_str(&text)?;
+    let res: Vec<Comment> = serde_json::from_str(&text).unwrap_or_default();
     let length = &res.len();
 
-    debug!("Got {length} posts for #{post_id}");
+    debug!("Got {length} comments for #{post_id}");
     Ok(res)
 }

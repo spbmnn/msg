@@ -26,10 +26,49 @@ pub struct Settings {
 
 #[derive(Debug)]
 pub struct UiState {
-    // Maybe replace this with an enum?
     pub view_mode: ViewMode,
     pub window_width: u32,
     pub window_height: u32,
+    pub history: ViewHistory,
+}
+
+/// Stacks for back/forward buttons.
+#[derive(Debug, Default)]
+pub struct ViewHistory {
+    /// "Undo" stack - push to when entering new state, pop when going back.
+    pub backwards: Vec<ViewMode>,
+    /// "Redo" stack - push to when undoing, pop when redoing.
+    pub forwards: Vec<ViewMode>,
+}
+
+impl ViewHistory {
+    /// Go backwards in the undo history, and store current state into redo.
+    pub fn previous(&mut self, current: ViewMode) -> Option<ViewMode> {
+        match self.backwards.pop() {
+            Some(x) => {
+                self.forwards.push(current);
+                Some(x)
+            }
+            None => None,
+        }
+    }
+
+    /// Go forwards in the redo history.
+    pub fn next(&mut self, old_view: ViewMode) -> Option<ViewMode> {
+        match self.forwards.pop() {
+            Some(x) => {
+                self.backwards.push(old_view);
+                Some(x)
+            }
+            None => None,
+        }
+    }
+
+    /// Store `view` in undo history and clear redo history.
+    pub fn proceed(&mut self, old_view: ViewMode) {
+        self.backwards.push(old_view);
+        self.forwards.clear();
+    }
 }
 
 #[derive(Debug)]
@@ -49,9 +88,11 @@ pub struct FollowedState {
     pub tags: Vec<FollowedTag>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ViewMode {
-    Grid,
+    /// Grid view with search query.
+    Grid(String),
+    /// Detail view with post ID.
     Detail(u32),
     Settings,
     Followed,
@@ -150,9 +191,10 @@ impl Default for App {
                 blacklist_content: Content::with_text(&blacklist).into(),
             },
             ui: UiState {
-                view_mode: ViewMode::Grid,
+                view_mode: ViewMode::Grid(String::from("order:rank")),
                 window_width: 480,
                 window_height: 640,
+                history: ViewHistory::default(),
             },
             search: SearchState {
                 input: String::new(),

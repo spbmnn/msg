@@ -1,7 +1,7 @@
 use reqwest::Method;
 use serde::Deserialize;
 use thiserror::Error;
-use tracing::{debug, instrument, trace};
+use tracing::{debug, error, instrument, trace};
 
 use crate::core::http::authed_request;
 
@@ -67,10 +67,11 @@ pub async fn fetch_posts(
     };
     //trace!("Raw response: {text}");
     let res: PostsResponse = serde_json::from_str(&text)?;
-    let length = &res.posts.len();
+    let posts = res.posts;
+    let length = &posts.len();
 
     debug!("Got {length} results for {tag}");
-    Ok(res.posts)
+    Ok(posts)
 }
 
 #[derive(Deserialize)]
@@ -139,6 +140,11 @@ pub async fn vote_post(auth: &Auth, id: u32, vote: Option<Vote>) -> Result<Optio
     }
 }
 
+#[derive(Deserialize, Debug)]
+struct FavoriteErrorResponse {
+    message: String,
+}
+
 #[instrument(skip(auth))]
 pub async fn favorite_post(auth: &Auth, id: u32) -> Result<(), ApiError> {
     let url = format!("{BASE_URL}/favorites.json");
@@ -157,6 +163,11 @@ pub async fn favorite_post(auth: &Auth, id: u32) -> Result<(), ApiError> {
         return Ok(());
     } else {
         let error_text = res.text().await.unwrap_or_default();
+        if let Ok(error) = serde_json::from_str::<FavoriteErrorResponse>(&error_text) {
+            if error.message == "You have already favorited this post" {
+                return Ok(());
+            }
+        }
         return Err(ApiError::VoteError(error_text));
     }
 }

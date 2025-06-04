@@ -1,4 +1,5 @@
 use crate::app::message::ViewMessage;
+use crate::app::state::ViewMode;
 use crate::app::App;
 use crate::app::Message;
 use crate::core::model::Rating;
@@ -10,8 +11,8 @@ use iced::{
 };
 
 pub fn detail_bar(app: &App) -> Row<'_, Message> {
-    let mut bar = row![button("back").on_press(Message::View(ViewMessage::ShowGrid))]
-        .align_y(Alignment::Center);
+    let mut bar =
+        row![button("back").on_press(Message::View(ViewMessage::Back))].align_y(Alignment::Center);
 
     if app.selected_post.is_none() {
         return bar.into();

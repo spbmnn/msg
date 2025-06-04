@@ -2,6 +2,7 @@ use iced::widget::image::Handle;
 use iced::widget::text_editor::Action;
 use url::Url;
 
+use crate::app::state::{UiState, ViewMode};
 use crate::core::config::MsgTheme;
 use crate::core::model::{Comment, Post, Vote};
 use crate::gui::video_player::VideoPlayerMessage;
@@ -66,6 +67,8 @@ pub enum SettingsMessage {
     ApiKeyChanged(String),
     BlacklistEdited(Action),
     FollowFieldChanged(String),
+    PPRChanged(usize),
+    TileSizeChanged(usize),
     PurgeCache,
     Save,
 }
@@ -83,10 +86,12 @@ pub enum FollowedMessage {
 /// Messages to manage view states (settings, followed, etc.)
 #[derive(Debug, Clone)]
 pub enum ViewMessage {
-    ShowSettings,
-    ShowGrid,
+    Show(ViewMode),
+    ShowWithoutProceed(ViewMode),
     WindowResized(u32, u32),
     /// For mouse back button, calls ShowGrid or Settings::Save accordingly
     Back,
+    /// For mouse forward button
+    Forward,
     UpdateTheme(MsgTheme),
 }

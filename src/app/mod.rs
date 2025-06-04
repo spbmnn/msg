@@ -1,5 +1,5 @@
 pub mod message;
-mod state;
+pub mod state;
 mod subscription;
 mod update;
 mod view;

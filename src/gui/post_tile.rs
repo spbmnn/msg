@@ -2,16 +2,18 @@ use iced::{
     widget::{button, column, container, image, image::Handle, row, text, Button, Column},
     Element, Length,
 };
+use std::cmp::min;
 
 use crate::{
     app::{
-        message::{PostMessage, SearchMessage},
+        message::{SearchMessage, ViewMessage},
+        state::ViewMode,
         Message,
     },
     core::model::{Post, Rating},
 };
 
-pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>) -> Element<'a, Message> {
+pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>, width: f32) -> Element<'a, Message> {
     let rating_text = match post.rating {
         Rating::Safe => text("S").color(iced::Color::from_rgb(0.3, 0.9, 0.3)),
         Rating::Questionable => text("Q").color(iced::Color::from_rgb(0.9, 0.7, 0.2)),
@@ -19,17 +21,19 @@ pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>) -> Element<'a, Messag
     }
     .size(12);
 
+    let thumbnail_size = width * (5.0 / 6.0);
+
     let preview: Element<_> = if let Some(img) = thumbnail {
         image(img.clone())
-            .width(Length::Fixed(150.0))
-            .height(Length::Fixed(150.0))
+            .width(Length::Fixed(thumbnail_size))
+            .height(Length::Fixed(thumbnail_size))
             .into()
     } else {
         container(text("No preview"))
-            .width(Length::Fixed(150.0))
-            .height(Length::Fixed(150.0))
-            .center_x(Length::Fixed(150.0))
-            .center_y(Length::Fixed(150.0))
+            .width(Length::Fixed(thumbnail_size))
+            .height(Length::Fixed(thumbnail_size))
+            .center_x(Length::Fixed(thumbnail_size))
+            .center_y(Length::Fixed(thumbnail_size))
             .into()
     };
 
@@ -44,9 +48,12 @@ pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>) -> Element<'a, Messag
 
     let layout = column![preview, meta].spacing(4).padding(8);
 
+    let height = width * (1.25);
+
     Button::new(layout)
-        .on_press(Message::Post(PostMessage::View(post.id)))
-        .width(Length::Shrink)
+        .on_press(Message::View(ViewMessage::Show(ViewMode::Detail(post.id))))
+        .width(Length::Fixed(width))
+        .height(Length::Fixed(height))
         .padding(4)
         .into()
 }
@@ -54,16 +61,20 @@ pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>) -> Element<'a, Messag
 pub fn grid_view<'a>(
     posts: &[Post],
     images: &[Option<&Handle>],
-    width: usize,
+    window_width: usize,
+    posts_per_row: usize,
+    tile_width: usize,
     load_more: bool,
 ) -> Column<'a, Message> {
     let mut grid = column![];
 
-    for chunk in posts.iter().zip(images).collect::<Vec<_>>().chunks(width) {
+    let chunks = min(window_width / tile_width, posts_per_row);
+
+    for chunk in posts.iter().zip(images).collect::<Vec<_>>().chunks(chunks) {
         let mut r = row![];
 
         for (post, img) in chunk {
-            r = r.push(render(post, **img));
+            r = r.push(render(post, **img, tile_width as f32));
         }
 
         grid = grid.push(container(r).center_x(Length::Fill).width(Length::Fill));

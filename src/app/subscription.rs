@@ -15,6 +15,9 @@ pub fn subscription(app: &App) -> Subscription<Message> {
         Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Back)) => {
             Some(Message::View(ViewMessage::Back))
         }
+        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Forward)) => {
+            Some(Message::View(ViewMessage::Forward))
+        }
         _ => None,
     }));
 

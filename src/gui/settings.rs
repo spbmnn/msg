@@ -6,13 +6,19 @@ use iced::{
     },
     Element, Length,
 };
+use iced_aw::number_input;
 
 use crate::{
     app::{
         message::{FollowedMessage, SettingsMessage, ViewMessage},
         Message,
     },
-    core::{config::MsgTheme, media::cache_dir, model::FollowedTag, store::PostStore},
+    core::{
+        config::{MsgTheme, ViewConfig},
+        media::cache_dir,
+        model::FollowedTag,
+        store::PostStore,
+    },
 };
 
 pub fn render_settings<'a>(
@@ -22,7 +28,7 @@ pub fn render_settings<'a>(
     followed_tags: &'a Vec<FollowedTag>,
     cache: &'a PostStore,
     new_followed_tag: &'a str,
-    current_theme: &'a MsgTheme,
+    view_config: &'a ViewConfig,
 ) -> Element<'a, Message> {
     let username_input = text_input("username", username)
         .on_input(|user| Message::Settings(SettingsMessage::UsernameChanged(user)));
@@ -34,7 +40,8 @@ pub fn render_settings<'a>(
         .height(300);
 
     let cache_info = cache_info(cache);
-    let appearance_settings = appearance_settings(current_theme);
+    let appearance_settings = appearance_settings(&view_config.theme);
+    let view_settings = view_settings(view_config);
 
     scrollable(
         column![
@@ -47,6 +54,7 @@ pub fn render_settings<'a>(
             cache_info,
             text("appearance").size(16),
             appearance_settings,
+            view_settings
         ]
         .spacing(12)
         .padding(24),
@@ -122,6 +130,27 @@ fn appearance_settings<'a>(current_theme: &'a MsgTheme) -> Element<'a, Message> 
             Message::View(ViewMessage::UpdateTheme(theme))
         })
     ]];
+
+    container(settings.spacing(4).padding(8))
+        .style(container::bordered_box)
+        .into()
+}
+
+fn view_settings<'a>(config: &'a ViewConfig) -> Element<'a, Message> {
+    let settings = column![
+        row![
+            text("Max posts per row"),
+            number_input(&config.posts_per_row, 1..=10, |value| {
+                Message::Settings(SettingsMessage::PPRChanged(value))
+            })
+        ],
+        row![
+            text("Post tile size"),
+            number_input(&config.tile_width, 180..=360, |value| {
+                Message::Settings(SettingsMessage::TileSizeChanged(value))
+            })
+        ]
+    ];
 
     container(settings.spacing(4).padding(8))
         .style(container::bordered_box)

@@ -1,5 +1,5 @@
 use iced::{
-    widget::{column, Row},
+    widget::{column, Row, Space},
     Alignment, Element, Length, Theme,
 };
 
@@ -14,7 +14,7 @@ mod settings;
 
 pub fn view(app: &App) -> Element<'_, Message> {
     let header: Row<Message> = match app.ui.view_mode {
-        ViewMode::Grid => grid::search_bar(app),
+        ViewMode::Grid(_) => grid::search_bar(app),
         ViewMode::Detail(_) => detail::detail_bar(app),
         ViewMode::Settings => settings::settings_bar(app),
         ViewMode::Followed => followed::followed_bar(),
@@ -25,17 +25,14 @@ pub fn view(app: &App) -> Element<'_, Message> {
     .align_y(Alignment::Center);
 
     // todo: add header bar in a similar manner
-    let main_view = match app.ui.view_mode {
-        ViewMode::Grid => grid::render_grid(app),
+    let main_view = match &app.ui.view_mode {
+        ViewMode::Grid(query) => grid::render_grid(app, &query),
         ViewMode::Detail(_) => detail::render_detail(app),
         ViewMode::Settings => settings::render_settings(app),
         ViewMode::Followed => followed::render_followed(app),
     };
 
-    //let debug_overlay = debug::render_debug_overlay(app);
-
-    //let debug_row: Vec<Element<Message>> =
-    //    vec![Space::with_width(Length::Fill).into(), debug_overlay];
+    // let debug_overlay = debug::render_debug_overlay(app);
 
     column![header, main_view]
         .width(Length::Fill)
@@ -47,8 +44,8 @@ pub fn view(app: &App) -> Element<'_, Message> {
 pub fn title(app: &App) -> String {
     let name = env!("CARGO_PKG_NAME");
     let version = env!("CARGO_PKG_VERSION");
-    let window_title: String = match app.ui.view_mode {
-        ViewMode::Grid => app.search.query.clone(),
+    let window_title: String = match &app.ui.view_mode {
+        ViewMode::Grid(query) => query.clone(),
         ViewMode::Followed => "Followed tags".into(),
         ViewMode::Settings => "Settings".into(),
         ViewMode::Detail(id) => format!("Post #{id}"),
@@ -59,5 +56,5 @@ pub fn title(app: &App) -> String {
 
 /// Gets the theme.
 pub fn theme(app: &App) -> Theme {
-    app.config.theme.get()
+    app.config.view.theme.get()
 }

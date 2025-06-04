@@ -9,8 +9,6 @@ use tracing::info;
 
 use super::{blacklist::Blacklist, model::FollowedTag};
 
-const FILE_NAME: &str = "config.toml";
-
 #[derive(Debug, Error)]
 pub enum ConfigError {
     #[error("couldn't get config path")]
@@ -53,12 +51,25 @@ impl ToString for MsgTheme {
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, Flow)]
-#[flow(variant = 1)]
+#[flow(variant = 2)]
+#[variants(ConfigV1)]
 pub struct Config {
+    #[serde(default)]
+    pub auth: Option<Auth>,
+    #[serde(default)]
+    pub blacklist: Blacklist,
+    #[serde(default)]
+    pub followed_tags: Vec<FollowedTag>,
+    #[serde(default)]
+    pub view: ViewConfig,
+}
+
+#[derive(Serialize, Deserialize, Default, Clone, Debug, Flow)]
+#[flow(variant = 1)]
+pub struct ConfigV1 {
     pub auth: Option<Auth>,
     pub blacklist: Blacklist,
     pub followed_tags: Vec<FollowedTag>,
-    #[serde(default)]
     pub theme: MsgTheme,
 }
 
@@ -66,6 +77,34 @@ pub struct Config {
 pub struct Auth {
     pub username: String,
     pub api_key: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ViewConfig {
+    #[serde(default)]
+    pub theme: MsgTheme,
+    #[serde(default = "default_ppr")]
+    pub posts_per_row: usize,
+    #[serde(default = "default_tile_width")]
+    pub tile_width: usize,
+}
+
+fn default_ppr() -> usize {
+    5
+}
+
+fn default_tile_width() -> usize {
+    180
+}
+
+impl Default for ViewConfig {
+    fn default() -> Self {
+        ViewConfig {
+            theme: MsgTheme::default(),
+            posts_per_row: 5,
+            tile_width: 180,
+        }
+    }
 }
 
 impl fmt::Debug for Auth {
@@ -77,27 +116,19 @@ impl fmt::Debug for Auth {
     }
 }
 
-fn config_path() -> Result<PathBuf, ConfigError> {
+pub fn config_path() -> Result<PathBuf, ConfigError> {
     ProjectDirs::from("xyz", "stripywalrus", "msg")
-        .map(|dirs| dirs.config_dir().join(FILE_NAME))
+        .map(|dirs| dirs.config_dir().to_path_buf())
         .ok_or(ConfigError::LoadPathError)
 }
 
 impl Config {
     pub fn new() -> Config {
-        let path = config_path().unwrap();
-
-        if let Ok(raw) = fs::read_to_string(&path) {
-            if let Ok(config) = toml::from_str::<Config>(&raw) {
-                return config;
-            }
-        }
-
-        Config::default()
+        Config::load().unwrap_or_default()
     }
 
     pub fn load() -> Result<Config, ConfigError> {
-        let path = config_path()?;
+        let path = config_path()?.join("config.toml");
 
         let raw = fs::read_to_string(&path)?;
         let config = toml::from_str::<Config>(&raw)?;
@@ -107,7 +138,7 @@ impl Config {
     }
 
     pub fn save(&self) -> Result<(), ConfigError> {
-        let path = config_path()?;
+        let path = config_path()?.join("config.toml");
         fs::create_dir_all(path.parent().unwrap())?;
         let toml = toml::to_string_pretty(self)?;
         fs::write(path, toml)?;

@@ -7,7 +7,8 @@ use iced::widget::{Column, Row, Text};
 use iced::{Alignment, Element, Length, Theme};
 use iced_gif::Gif;
 
-use crate::app::message::PostMessage;
+use crate::app::message::{PostMessage, ViewMessage};
+use crate::app::state::ViewMode;
 use crate::core::model::{Comment, Vote};
 use crate::{
     app::message::{DetailMessage, FollowedMessage, MediaMessage, SearchMessage},
@@ -111,7 +112,9 @@ fn render_tag(tag: &String) -> Element<'_, Message> {
             .padding(4)
             .width(24),
         button(text(tag))
-            .on_press(Message::Search(SearchMessage::LoadPosts(tag.clone())))
+            .on_press(Message::View(ViewMessage::Show(ViewMode::Grid(
+                tag.clone()
+            ))))
             .padding(4),
     ]
     .into()

@@ -33,9 +33,8 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
     match msg {
         SearchMessage::LoadPosts(query) => {
             app.loading = true;
-            app.posts.clear();
             app.selected_post = None;
-            app.ui.view_mode = ViewMode::Grid;
+            app.ui.view_mode = ViewMode::Grid(query.clone());
             app.search.query = query.clone();
             app.search.input = query.clone();
             let auth = app.config.auth.clone();
@@ -73,16 +72,15 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
                 .filter(|p| !blacklist::is_blacklisted(p, &app.config.blacklist))
                 .collect::<Vec<Post>>();
             app.store.insert_posts(filtered.clone());
-            let new_posts = filtered
-                .into_iter()
-                .filter(|p| !app.posts.iter().any(|existing| existing.id == p.id))
-                .collect::<Vec<Post>>();
-            app.posts.extend(new_posts.clone());
+
+            let mut post_ids: Vec<u32> = Vec::new();
 
             let mut queued_post_count: usize = 0;
-
-            for post in &new_posts {
+            for post in &filtered {
+                post_ids.push(post.id);
                 if post.is_favorited {
+                    let post_id = post.id;
+                    trace!("{post_id} is already favorited");
                     app.store.set_favorite(post.id, true);
                 }
                 if post.preview.url.is_some() {
@@ -90,15 +88,25 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
                     queued_post_count += 1;
                 }
             }
+
+            app.store.insert_results(&app.search.query, &post_ids);
+
+            let new_posts = filtered
+                .into_iter()
+                .filter(|p| !app.posts.iter().any(|existing| existing.id == p.id))
+                .collect::<Vec<Post>>();
+            app.posts.extend(new_posts.clone());
+
             info!("Loading thumbnails for {queued_post_count} posts");
         }
         SearchMessage::InputChanged(text) => {
             app.search.input = text;
         }
         SearchMessage::Submitted => {
-            app.posts.clear();
+            app.ui.history.proceed(app.ui.view_mode.clone());
             let query = app.search.input.trim().to_string();
             app.search.query = query.clone();
+            app.ui.view_mode = ViewMode::Grid(query.clone());
             if !query.is_empty() {
                 info!("Submitting search for {query}");
                 let auth = app.config.auth.clone();
@@ -135,6 +143,10 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
 
             // Build task batch
             let mut commands = vec![];
+
+            if app.store.is_favorited(id) {
+                app.store.get_post_mut(id).unwrap().is_favorited = true;
+            }
 
             if let Some(post) = app.store.get_post(id) {
                 // TODO: Deal with .swfs for compatiblity.
@@ -303,13 +315,13 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
     match msg {
         DetailMessage::AddTagToSearch(tag) => {
             app.selected_post = None;
-            app.ui.view_mode = ViewMode::Grid;
             app.search.query.push_str(&(" ".to_owned() + &tag));
             app.search.input = app.search.query.clone();
             app.loading = true;
+            app.ui.view_mode = ViewMode::Grid(app.search.query.clone());
             let query = app.search.query.clone();
 
-            return Task::done(Message::Search(SearchMessage::LoadPosts(query)));
+            return Task::done(Message::View(ViewMessage::Show(ViewMode::Grid(query))));
         }
         DetailMessage::NegateTagFromSearch(tag) => {
             app.selected_post = None;
@@ -317,9 +329,10 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
             app.search.input = app.search.query.clone();
             app.loading = true;
 
+            app.ui.view_mode = ViewMode::Grid(app.search.query.clone());
             let query = app.search.query.clone();
 
-            return Task::done(Message::Search(SearchMessage::LoadPosts(query)));
+            return Task::done(Message::View(ViewMessage::Show(ViewMode::Grid(query))));
         }
         DetailMessage::CommentsLoaded(comments) => {
             app.store.insert_comments(comments);
@@ -366,10 +379,21 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
                 warn!("Faled to save config: {err}");
             }
 
-            app.ui.view_mode = ViewMode::Grid;
+            return Task::done(Message::View(ViewMessage::Show(
+                app.ui
+                    .history
+                    .previous(app.ui.view_mode.clone())
+                    .unwrap_or(ViewMode::Grid(String::from("order:id_desc"))),
+            )));
         }
         SettingsMessage::PurgeCache => {
             let _purge_result = app.store.purge();
+        }
+        SettingsMessage::PPRChanged(ppr) => {
+            app.config.view.posts_per_row = ppr;
+        }
+        SettingsMessage::TileSizeChanged(tile_size) => {
+            app.config.view.tile_width = tile_size;
         }
     }
     Task::none()
@@ -390,7 +414,9 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
                     Ok(updates) => Message::Followed(FollowedMessage::UpdatesReceived(updates)),
                     Err(err) => {
                         error!("{err}");
-                        Message::View(ViewMessage::ShowGrid)
+                        Message::View(ViewMessage::Show(ViewMode::Grid(String::from(
+                            "order:id_desc",
+                        ))))
                     }
                 },
             );
@@ -448,26 +474,80 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
 
 fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
     match msg {
-        ViewMessage::ShowSettings => {
-            app.ui.view_mode = ViewMode::Settings;
-        }
-        ViewMessage::ShowGrid => {
+        ViewMessage::Show(mode) => {
+            app.ui.history.proceed(app.ui.view_mode.clone());
+            match &mode {
+                ViewMode::Detail(id) => return Task::done(Message::Post(PostMessage::View(*id))),
+                ViewMode::Grid(query) => {
+                    app.search.query = query.clone();
+                    app.search.input = query.clone();
+                    app.selected_post = None;
+                    app.video_player = None;
+                    app.ui.view_mode = mode.clone();
+                    return Task::done(Message::Search(SearchMessage::LoadPosts(query.clone())));
+                }
+                _ => {}
+            }
             app.selected_post = None;
             app.video_player = None;
-            app.ui.view_mode = ViewMode::Grid;
+            app.ui.view_mode = mode;
+
+            debug!(?app.ui.history.backwards, ?app.ui.history.forwards);
+        }
+        ViewMessage::ShowWithoutProceed(mode) => {
+            match &mode {
+                ViewMode::Detail(id) => return Task::done(Message::Post(PostMessage::View(*id))),
+                ViewMode::Grid(query) => {
+                    app.search.query = query.clone();
+                    app.search.input = query.clone();
+                    app.ui.view_mode = mode.clone();
+                    return Task::done(Message::Search(SearchMessage::LoadPosts(query.clone())));
+                }
+                _ => {}
+            }
+            app.selected_post = None;
+            app.video_player = None;
+            app.ui.view_mode = mode;
         }
         ViewMessage::WindowResized(width, height) => {
             app.ui.window_width = width;
             app.ui.window_height = height;
         }
         ViewMessage::Back => {
-            return match app.ui.view_mode {
-                ViewMode::Settings => Task::done(Message::Settings(SettingsMessage::Save)),
-                _ => Task::done(Message::View(ViewMessage::ShowGrid)),
+            match &app.ui.view_mode {
+                ViewMode::Settings => return Task::done(Message::Settings(SettingsMessage::Save)),
+                ViewMode::Grid(query) => {
+                    app.search.query = query.clone();
+                    app.search.input = query.clone();
+                }
+                _ => {}
+            }
+            return Task::done(Message::View(ViewMessage::ShowWithoutProceed(
+                app.ui
+                    .history
+                    .previous(app.ui.view_mode.clone())
+                    .unwrap_or(ViewMode::Grid(String::from("order:id_desc"))),
+            )));
+        }
+        ViewMessage::Forward => {
+            if let Some(next_view) = app.ui.history.next(app.ui.view_mode.clone()) {
+                match &next_view {
+                    ViewMode::Detail(id) => {
+                        return Task::done(Message::Post(PostMessage::View(*id)))
+                    }
+                    ViewMode::Grid(query) => {
+                        app.search.query = query.clone();
+                        app.search.input = query.clone();
+                    }
+                    _ => {}
+                }
+                return Task::done(Message::View(ViewMessage::ShowWithoutProceed(
+                    next_view.clone(),
+                )));
             }
         }
         ViewMessage::UpdateTheme(theme) => {
-            app.config.theme = theme;
+            app.config.view.theme = theme;
         }
     }
     Task::none()

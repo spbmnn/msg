@@ -1,7 +1,11 @@
 use crate::app::message::{FollowedMessage, SearchMessage, ViewMessage};
+use crate::app::state::ViewMode;
 use crate::app::App;
 use crate::app::Message;
+use crate::core::config::Auth;
+use crate::core::model::Post;
 use iced::widget::image::Handle;
+use iced::Length;
 use iced::{
     widget::{button, row, scrollable, text_input, Row},
     Element,
@@ -15,13 +19,20 @@ pub fn search_bar(app: &App) -> Row<'_, Message> {
             .padding(8)
             .size(16),
         button("favorites")
-            .on_press(Message::Search(SearchMessage::GetFavorites))
+            .on_press(Message::View(ViewMessage::Show(ViewMode::Grid(format!(
+                "fav:{}",
+                app.config
+                    .auth
+                    .as_ref()
+                    .unwrap_or(&Auth::default())
+                    .username
+            )))))
             .padding(8),
         button("search")
             .on_press(Message::Search(SearchMessage::Submitted))
             .padding(8),
         button("settings")
-            .on_press(Message::View(ViewMessage::ShowSettings))
+            .on_press(Message::View(ViewMessage::Show(ViewMode::Settings)))
             .padding(8),
         button("followed")
             .on_press(Message::Followed(FollowedMessage::CheckUpdates))
@@ -29,19 +40,29 @@ pub fn search_bar(app: &App) -> Row<'_, Message> {
     ]
 }
 
-pub fn render_grid(app: &App) -> Element<'_, Message> {
+pub fn render_grid<'a>(app: &'a App, query: &'a str) -> Element<'a, Message> {
     let mut images: Vec<Option<&Handle>> = vec![];
+    let posts: Vec<Post> = app
+        .store
+        .get_results(query)
+        .unwrap_or(&Vec::new())
+        .iter()
+        .filter_map(|&id| app.store.get_post(id).cloned())
+        .collect();
 
-    for post in &app.posts {
+    for post in &posts {
         let thumb = app.store.get_thumbnail(post.id);
         images.push(thumb);
     }
 
-    let tile_width = 180;
-    let max_columns = (app.ui.window_width / tile_width.max(1)).max(1);
+    let content = crate::gui::post_tile::grid_view(
+        &posts,
+        images.as_slice(),
+        app.ui.window_width as usize,
+        app.config.view.posts_per_row,
+        app.config.view.tile_width,
+        true,
+    );
 
-    let content =
-        crate::gui::post_tile::grid_view(&app.posts, images.as_slice(), max_columns as usize, true);
-
-    scrollable(content.padding(16)).into()
+    scrollable(content.padding(16)).width(Length::Fill).into()
 }

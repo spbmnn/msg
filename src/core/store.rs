@@ -1,5 +1,4 @@
 use std::{
-    collections::{HashMap, HashSet},
     fs,
     io::{BufReader, BufWriter},
     path::{Path, PathBuf},
@@ -10,6 +9,7 @@ use directories::ProjectDirs;
 use iced::widget::image::Handle;
 use iced_gif::Frames;
 use rmp_serde::Serializer;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use serde_flow::Flow;
 use thiserror::Error;
@@ -39,26 +39,29 @@ pub enum StoreError {
 #[derive(Debug, Default)]
 pub struct PostStore {
     /// List of [`Post`]s.
-    pub posts: HashMap<u32, Post>,
+    pub posts: FxHashMap<u32, Post>,
     /// Post thumbnails, stored as [Handle]s of image data.
-    pub thumbnails: HashMap<u32, Handle>,
+    pub thumbnails: FxHashMap<u32, Handle>,
     /// Post images, stored as [Handle]s of image data.
-    pub images: HashMap<u32, Handle>,
+    pub images: FxHashMap<u32, Handle>,
     /// Post GIFs, stored as raw bytes.
-    pub gifs: HashMap<u32, Vec<u8>>,
+    pub gifs: FxHashMap<u32, Vec<u8>>,
     /// Post GIFs, stored as [Frames].
-    pub gif_frames: HashMap<u32, Frames>,
+    pub gif_frames: FxHashMap<u32, Frames>,
     /// Post videos, stored as the location on disk (as a [`Url`]).
-    pub videos: HashMap<u32, Url>,
+    pub videos: FxHashMap<u32, Url>,
 
     /// Stored votes.
     /// Note that the e6 API has no way to see previous votes your account has made, so these are only votes made within MSG.
-    pub votes: HashMap<u32, Vote>,
+    pub votes: FxHashMap<u32, Vote>,
     /// List of posts (by ID) that have been favorited.
-    pub favorites: HashSet<u32>,
+    pub favorites: FxHashSet<u32>,
 
     /// Stored comments. Currently not kept across sessions.
-    pub comments: HashMap<u32, Vec<Comment>>,
+    pub comments: FxHashMap<u32, Vec<Comment>>,
+
+    /// Stored results for queries. Not kept across sessions.
+    pub results: FxHashMap<String, Vec<u32>>,
 }
 
 /// Used for serializing [`PostStore`]s.
@@ -66,35 +69,27 @@ pub struct PostStore {
 #[flow(variant = 1)]
 pub struct PostStoreData {
     /// List of [`Post`]s.
-    pub posts: HashMap<u32, Post>,
+    pub posts: FxHashMap<u32, Post>,
     /// List of paths to thumbnail images stored on disk.
-    pub thumbnails: HashMap<u32, PathBuf>,
+    pub thumbnails: FxHashMap<u32, PathBuf>,
     /// List of paths to post images stored on disk.
-    pub images: HashMap<u32, PathBuf>,
+    pub images: FxHashMap<u32, PathBuf>,
     /// List of paths to GIFs stored on disk.
-    pub gifs: HashMap<u32, PathBuf>,
+    pub gifs: FxHashMap<u32, PathBuf>,
     /// List of paths to videos stored on disk.
     /// TODO: Make this PathBuf like the rest.
-    pub videos: HashMap<u32, String>,
+    pub videos: FxHashMap<u32, String>,
     /// Stored votes.
     /// Note that the e6 API has no way to see previous votes your account has made, so these are only votes made within MSG.
-    pub votes: HashMap<u32, bool>,
+    pub votes: FxHashMap<u32, bool>,
     /// List of posts (by ID) that have been favorited.
-    pub favorites: HashSet<u32>,
+    pub favorites: FxHashSet<u32>,
 }
 
 impl PostStore {
     pub fn new() -> Self {
         Self {
-            posts: HashMap::new(),
-            votes: HashMap::new(),
-            thumbnails: HashMap::new(),
-            images: HashMap::new(),
-            gifs: HashMap::new(),
-            gif_frames: HashMap::new(),
-            videos: HashMap::new(),
-            favorites: HashSet::new(),
-            comments: HashMap::new(),
+            ..Default::default()
         }
     }
 
@@ -113,6 +108,10 @@ impl PostStore {
 
     pub fn get_post(&self, id: u32) -> Option<&Post> {
         self.posts.get(&id)
+    }
+
+    pub fn get_post_mut(&mut self, id: u32) -> Option<&mut Post> {
+        self.posts.get_mut(&id)
     }
 
     // --- Comments ---
@@ -220,6 +219,15 @@ impl PostStore {
 
     pub fn get_video(&self, id: u32) -> Option<&Url> {
         self.videos.get(&id)
+    }
+
+    // --- Results ---
+    pub fn insert_results(&mut self, query: &str, posts: &[u32]) {
+        self.results.insert(String::from(query), Vec::from(posts));
+    }
+
+    pub fn get_results(&self, query: &str) -> Option<&Vec<u32>> {
+        self.results.get(query)
     }
 
     // --- Utilities ---

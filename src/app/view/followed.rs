@@ -1,3 +1,4 @@
+use crate::app::state::ViewMode;
 use crate::app::Message;
 use crate::app::{message::*, App};
 use crate::gui::post_tile::grid_view;
@@ -11,18 +12,15 @@ pub fn followed_bar<'a>() -> Row<'a, Message> {
     row![
         text("Followed tags").size(20).width(Length::Fill),
         button("settings")
-            .on_press(Message::View(ViewMessage::ShowSettings))
+            .on_press(Message::View(ViewMessage::Show(ViewMode::Settings)))
             .padding(8),
         button("back")
-            .on_press(Message::View(ViewMessage::ShowGrid))
+            .on_press(Message::View(ViewMessage::Back))
             .padding(8)
     ]
 }
 
 pub fn render_followed(app: &App) -> Element<'_, Message> {
-    let tile_width = 180;
-    let max_columns = (app.ui.window_width / tile_width.max(1)).max(1);
-
     let mut content = column![];
 
     for (tag, posts) in app.followed.new_followed_posts.clone() {
@@ -33,7 +31,14 @@ pub fn render_followed(app: &App) -> Element<'_, Message> {
         }
         content = content.push(column![
             text(tag),
-            grid_view(&posts, images.as_slice(), max_columns as usize, false),
+            grid_view(
+                &posts,
+                images.as_slice(),
+                app.ui.window_width as usize,
+                app.config.view.posts_per_row,
+                app.config.view.tile_width,
+                false
+            ),
         ]);
     }
 

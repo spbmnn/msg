@@ -21,6 +21,6 @@ pub fn render_settings(app: &App) -> Element<'_, Message> {
         &app.followed.tags,
         &app.store,
         &app.followed.new_followed_tag,
-        &app.config.theme,
+        &app.config.view,
     )
 }

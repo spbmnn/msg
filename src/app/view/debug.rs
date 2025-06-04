@@ -17,6 +17,10 @@ pub fn render_debug_overlay(app: &App) -> Element<'_, Message> {
             "Thumbnail queue: {}",
             app.search.thumbnail_queue.len()
         )),
+        text(format!(
+            "Undo: {:?}\nRedo:{:?}",
+            app.ui.history.backwards, app.ui.history.forwards
+        )),
     ];
 
     if let Some(auth) = &app.config.auth {

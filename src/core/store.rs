@@ -226,6 +226,18 @@ impl PostStore {
         self.results.insert(String::from(query), Vec::from(posts));
     }
 
+    pub fn update_results(&mut self, query: &str, posts: &[u32]) {
+        if let Some(result_vec) = self.results.get_mut(query) {
+            for post in posts {
+                if !result_vec.contains(post) {
+                    result_vec.push(*post);
+                }
+            }
+        } else {
+            self.insert_results(query, posts);
+        }
+    }
+
     pub fn get_results(&self, query: &str) -> Option<&Vec<u32>> {
         self.results.get(query)
     }

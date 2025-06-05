@@ -1,5 +1,5 @@
 use iced::{
-    widget::{column, Row, Space},
+    widget::{column, Row},
     Alignment, Element, Length, Theme,
 };
 

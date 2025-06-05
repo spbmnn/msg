@@ -11,7 +11,7 @@ use crate::app::message::{PostMessage, ViewMessage};
 use crate::app::state::ViewMode;
 use crate::core::model::{Comment, Vote};
 use crate::{
-    app::message::{DetailMessage, FollowedMessage, MediaMessage, SearchMessage},
+    app::message::{DetailMessage, FollowedMessage, MediaMessage},
     app::Message,
     core::{model::Post, store::PostStore},
 };

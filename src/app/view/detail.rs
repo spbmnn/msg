@@ -1,5 +1,5 @@
+use crate::app::message::DetailMessage;
 use crate::app::message::ViewMessage;
-use crate::app::state::ViewMode;
 use crate::app::App;
 use crate::app::Message;
 use crate::core::model::Rating;
@@ -26,6 +26,7 @@ pub fn detail_bar(app: &App) -> Row<'_, Message> {
         Rating::Explicit => "Rating: Explicit",
     }));
     bar = bar.push(text(format!("Score: {}", post.score.total)));
+    bar = bar.push(button("copy URL").on_press(Message::Detail(DetailMessage::CopyURL)));
 
     bar
 }

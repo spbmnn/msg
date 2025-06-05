@@ -58,6 +58,7 @@ pub enum DetailMessage {
     AddTagToSearch(String),
     NegateTagFromSearch(String),
     CommentsLoaded(Vec<Comment>),
+    CopyURL,
 }
 
 /// Messages to manage settings menu state.

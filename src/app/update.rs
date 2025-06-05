@@ -11,7 +11,7 @@ use crate::core::model::{FollowedTag, Post};
 use crate::core::store::poststore_path;
 use crate::core::{blacklist, followed, media};
 use crate::gui::video_player::VideoPlayerWidget;
-use iced::{window, Task};
+use iced::{clipboard, window, Task};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[instrument(skip_all)]
@@ -89,7 +89,7 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
                 }
             }
 
-            app.store.insert_results(&app.search.query, &post_ids);
+            app.store.update_results(&app.search.query, &post_ids);
 
             let new_posts = filtered
                 .into_iter()
@@ -336,9 +336,16 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
         }
         DetailMessage::CommentsLoaded(comments) => {
             app.store.insert_comments(comments);
-            Task::none()
+        }
+        DetailMessage::CopyURL => {
+            if let Some(post) = app.selected_post {
+                let url = format!("https://e621.net/posts/{}", post);
+                info!("Copying {url} to clipboard");
+                return clipboard::write(url);
+            }
         }
     }
+    Task::none()
 }
 
 fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {

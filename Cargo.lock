@@ -3039,7 +3039,6 @@ dependencies = [
  "rmp-serde",
  "rustc-hash 2.1.1",
  "serde",
- "serde_flow",
  "serde_json",
  "tempfile",
  "thiserror 2.0.12",
@@ -4647,33 +4646,6 @@ checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
-]
-
-[[package]]
-name = "serde_flow"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81a8cb3a17c770f98d417fb92599b39c89bf0ed22eb6a3b9dfd6305cb9bdaadd"
-dependencies = [
- "bincode 1.3.3",
- "crc",
- "futures-util",
- "serde",
- "serde_flow_derive",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "serde_flow_derive"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d4c8f8b9a07a3753eaa691fe74598f19050a7672643f425b729813ba33011d3"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde",
  "syn 2.0.100",
 ]
 

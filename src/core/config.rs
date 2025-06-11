@@ -2,12 +2,24 @@ use core::fmt;
 use directories::ProjectDirs;
 use iced::Theme;
 use serde::{Deserialize, Serialize};
-use serde_flow::Flow;
 use std::{fs, path::PathBuf};
 use thiserror::Error;
 use tracing::info;
 
-use super::{blacklist::Blacklist, model::FollowedTag};
+use super::blacklist::Blacklist;
+
+const fn _default_true() -> bool {
+    true
+}
+const fn _default_false() -> bool {
+    false
+}
+const fn default_ppr() -> usize {
+    5
+}
+const fn default_tile_width() -> usize {
+    180
+}
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -50,27 +62,13 @@ impl ToString for MsgTheme {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug, Flow)]
-#[flow(variant = 2)]
-#[variants(ConfigV1)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[serde(default)]
 pub struct Config {
-    #[serde(default)]
     pub auth: Option<Auth>,
-    #[serde(default)]
     pub blacklist: Blacklist,
-    #[serde(default)]
-    pub followed_tags: Vec<FollowedTag>,
-    #[serde(default)]
+    pub followed_tags: FxHashMap<String, Option<u32>>,
     pub view: ViewConfig,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone, Debug, Flow)]
-#[flow(variant = 1)]
-pub struct ConfigV1 {
-    pub auth: Option<Auth>,
-    pub blacklist: Blacklist,
-    pub followed_tags: Vec<FollowedTag>,
-    pub theme: MsgTheme,
 }
 
 #[derive(Deserialize, Default, Serialize, Clone)]
@@ -87,14 +85,10 @@ pub struct ViewConfig {
     pub posts_per_row: usize,
     #[serde(default = "default_tile_width")]
     pub tile_width: usize,
-}
-
-fn default_ppr() -> usize {
-    5
-}
-
-fn default_tile_width() -> usize {
-    180
+    #[serde(default = "_default_false")]
+    pub download_sample: bool,
+    #[serde(default = "_default_true")]
+    pub download_fullsize: bool,
 }
 
 impl Default for ViewConfig {
@@ -103,6 +97,8 @@ impl Default for ViewConfig {
             theme: MsgTheme::default(),
             posts_per_row: 5,
             tile_width: 180,
+            download_sample: false,
+            download_fullsize: true,
         }
     }
 }

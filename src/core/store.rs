@@ -347,6 +347,12 @@ impl PostStore {
             }
         }
 
+        for (id, path) in data.samples {
+            if let Ok(bytes) = std::fs::read(&path) {
+                store.insert_sample(id, Handle::from_bytes(bytes));
+            }
+        }
+
         for (id, path) in data.images {
             if let Ok(bytes) = std::fs::read(&path) {
                 store.insert_image(id, Handle::from_bytes(bytes));

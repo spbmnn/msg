@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use byte_unit::{Byte, UnitType};
 use iced::{
     widget::{
@@ -16,7 +18,7 @@ use crate::{
     },
     core::{
         config::{MsgTheme, ViewConfig},
-        media::cache_dir,
+        media::{cache_dir, gif_dir, image_dir, sample_dir, thumbnail_dir, video_dir},
         store::PostStore,
     },
 };
@@ -63,24 +65,35 @@ pub fn render_settings<'a>(
 }
 
 fn cache_info<'a>(cache: &'a PostStore) -> Element<'a, Message> {
-    let cache_size_bytes = fs_extra::dir::get_size(cache_dir());
-
-    let cache_size_text = match cache_size_bytes {
-        Ok(size) => format!(
-            "{:.2}",
-            Byte::from_u64(size).get_appropriate_unit(UnitType::Binary)
-        ),
-        Err(_) => "unknown".to_string(),
-    };
-
     let info_lines = column![
-        text(format!("Cache size: {}", cache_size_text)),
+        text(format!("Cache size: {}", get_directory_size(cache_dir()))),
         text(format!("Posts stored: {}", cache.posts.len())),
-        text(format!("Thumbnails cached: {}", cache.thumbnails.len())),
-        text(format!("Images cached: {}", cache.images.len())),
-        text(format!("Gifs cached: {}", cache.gifs.len())),
+        text(format!(
+            "Thumbnails cached: {} ({})",
+            cache.thumbnails.len(),
+            get_directory_size(thumbnail_dir())
+        )),
+        text(format!(
+            "Samples cached: {} ({})",
+            cache.samples.len(),
+            get_directory_size(sample_dir())
+        )),
+        text(format!(
+            "Images cached: {} ({})",
+            cache.images.len(),
+            get_directory_size(image_dir())
+        )),
+        text(format!(
+            "Gifs cached: {} ({})",
+            cache.gifs.len(),
+            get_directory_size(gif_dir())
+        )),
         text(format!("Gif framesets stored: {}", cache.gif_frames.len())),
-        text(format!("Videos cached: {}", cache.videos.len())),
+        text(format!(
+            "Videos cached: {} ({})",
+            cache.videos.len(),
+            get_directory_size(video_dir())
+        )),
         text(format!("Favorites stored: {}", cache.favorites.len())),
         text(format!("Votes stored: {}", cache.votes.len())),
         button("Purge cache")
@@ -91,6 +104,16 @@ fn cache_info<'a>(cache: &'a PostStore) -> Element<'a, Message> {
     ];
 
     container(info_lines.spacing(4).padding(8)).into()
+}
+
+fn get_directory_size(dir: PathBuf) -> String {
+    match fs_extra::dir::get_size(dir) {
+        Ok(bytes) => format!(
+            "{:.2}",
+            Byte::from_u64(bytes).get_appropriate_unit(UnitType::Binary)
+        ),
+        Err(_) => "unknown".to_string(),
+    }
 }
 
 fn followed_tag_settings<'a>(

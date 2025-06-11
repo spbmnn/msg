@@ -270,7 +270,7 @@ pub fn thumbnail_dir() -> PathBuf {
 }
 
 pub fn sample_dir() -> PathBuf {
-    cache_dir().join("samples")
+    cache_dir().join("sample")
 }
 
 pub fn image_dir() -> PathBuf {
@@ -279,4 +279,8 @@ pub fn image_dir() -> PathBuf {
 
 pub fn gif_dir() -> PathBuf {
     cache_dir().join("gifs")
+}
+
+pub fn video_dir() -> PathBuf {
+    cache_dir().join("video")
 }

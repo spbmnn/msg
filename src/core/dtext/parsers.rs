@@ -1,12 +1,16 @@
+mod inline;
+
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
-    character::complete::{digit1, not_line_ending},
+    character::complete::{char, digit1, not_line_ending},
     combinator::{map, recognize},
     multi::many0,
     sequence::{delimited, preceded},
     IResult, Parser,
 };
+
+use inline::*;
 
 use crate::core::dtext::model::DTextSpan;
 
@@ -18,24 +22,16 @@ pub fn parse_dtext(input: &str) -> IResult<&str, Vec<DTextSpan>> {
 /// Parses one DText span at a time.
 fn parse_span(input: &str) -> IResult<&str, DTextSpan> {
     alt((
-        parse_bold,
-        parse_italics,
-        parse_post_reference,
-        parse_plain_text,
+        bold,
+        italics,
+        strikeout,
+        underline,
+        superscript,
+        subscript,
+        spoiler,
+        inline_code,
     ))
     .parse(input)
-}
-
-/// Parses `[b]bold[/b]`
-fn parse_bold(input: &str) -> IResult<&str, DTextSpan> {
-    let (rest, content) = delimited(tag("[b]"), parse_dtext, tag("[/b]")).parse(input)?;
-    Ok((rest, DTextSpan::Bold(content)))
-}
-
-/// Parses `[i]italics[/i]`
-fn parse_italics(input: &str) -> IResult<&str, DTextSpan> {
-    let (rest, content) = delimited(tag("[i]"), parse_dtext, tag("[/i]")).parse(input)?;
-    Ok((rest, DTextSpan::Italics(content)))
 }
 
 fn parse_post_reference(input: &str) -> IResult<&str, DTextSpan> {

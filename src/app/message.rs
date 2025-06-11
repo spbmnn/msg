@@ -1,8 +1,9 @@
 use iced::widget::image::Handle;
 use iced::widget::text_editor::Action;
+use rustc_hash::FxHashMap;
 use url::Url;
 
-use crate::app::state::{UiState, ViewMode};
+use crate::app::state::ViewMode;
 use crate::core::config::MsgTheme;
 use crate::core::model::{Comment, Post, Vote};
 use crate::gui::video_player::VideoPlayerMessage;
@@ -46,6 +47,7 @@ pub enum PostMessage {
 #[derive(Debug, Clone)]
 pub enum MediaMessage {
     ThumbnailLoaded(u32, Handle),
+    SampleLoaded(u32, Handle),
     ImageLoaded(u32, Handle),
     GifLoaded(u32, Vec<u8>),
     VideoLoaded(u32, Url),
@@ -58,6 +60,8 @@ pub enum DetailMessage {
     AddTagToSearch(String),
     NegateTagFromSearch(String),
     CommentsLoaded(Vec<Comment>),
+    /// Open the post's file in the default OS app.
+    OpenFile,
     CopyURL,
 }
 
@@ -68,6 +72,8 @@ pub enum SettingsMessage {
     ApiKeyChanged(String),
     BlacklistEdited(Action),
     FollowFieldChanged(String),
+    FullsizeToggled(bool),
+    SampleToggled(bool),
     PPRChanged(usize),
     TileSizeChanged(usize),
     PurgeCache,
@@ -78,10 +84,11 @@ pub enum SettingsMessage {
 #[derive(Debug, Clone)]
 pub enum FollowedMessage {
     CheckUpdates,
-    UpdatesReceived(Vec<(String, Vec<Post>)>),
+    UpdatesReceived(FxHashMap<String, Vec<Post>>),
     AddTag,
     FollowTag(String),
     RemoveTag(String),
+    ClearSeenPosts,
 }
 
 /// Messages to manage view states (settings, followed, etc.)

@@ -1,32 +1,27 @@
-use crate::core::api;
+use crate::core::api::{self, FetchPoint};
 use crate::core::config::Auth;
-use crate::core::model::{FollowedTag, Post};
+use crate::core::model::Post;
+use rustc_hash::FxHashMap;
 use tracing::{instrument, warn};
 
 #[instrument(skip(auth))]
 pub async fn check_for_updates(
-    followed_tags: Vec<FollowedTag>,
+    followed_tags: FxHashMap<String, Option<u32>>,
     auth: Option<&Auth>,
-) -> Result<Vec<(String, Vec<Post>)>, api::ApiError> {
-    let mut updates = Vec::new();
+) -> Result<FxHashMap<String, Vec<Post>>, api::ApiError> {
+    let mut updates: FxHashMap<String, Vec<Post>> = FxHashMap::default();
 
-    for tag in followed_tags {
-        let tag_name = tag.tag.clone();
-        let last_seen = tag.last_seen_post_id;
-
-        match api::fetch_posts(auth, tag_name.clone(), None).await {
+    for (tag, last_seen) in followed_tags {
+        let fetch_point = match last_seen {
+            None => None,
+            Some(id) => Some(FetchPoint::After(id)),
+        };
+        match api::fetch_posts(auth, tag.clone(), fetch_point).await {
             Ok(posts) => {
-                let new_posts = match last_seen {
-                    Some(id) => posts.into_iter().take_while(|p| p.id > id).collect(),
-                    None => posts,
-                };
-
-                if !new_posts.is_empty() {
-                    updates.push((tag_name, new_posts));
-                }
+                updates.insert(tag, posts);
             }
             Err(err) => {
-                warn!("Failed to fetch for tag '{}': {err}", tag.tag);
+                warn!("Failed to fetch for tag '{}': {err}", tag);
             }
         }
     }

@@ -1,12 +1,13 @@
 use byte_unit::{Byte, UnitType};
 use iced::{
     widget::{
-        button, button::danger, column, container, pick_list, row, scrollable, text, text_editor,
-        text_editor::Content, text_input,
+        button, button::danger, checkbox, column, container, pick_list, row, scrollable, text,
+        text_editor, text_editor::Content, text_input,
     },
     Element, Length,
 };
 use iced_aw::number_input;
+use rustc_hash::FxHashMap;
 
 use crate::{
     app::{
@@ -16,7 +17,6 @@ use crate::{
     core::{
         config::{MsgTheme, ViewConfig},
         media::cache_dir,
-        model::FollowedTag,
         store::PostStore,
     },
 };
@@ -25,7 +25,7 @@ pub fn render_settings<'a>(
     username: &'a str,
     api_key: &'a str,
     blacklist_content: &'a Content,
-    followed_tags: &'a Vec<FollowedTag>,
+    followed_tags: &'a FxHashMap<String, Option<u32>>,
     cache: &'a PostStore,
     new_followed_tag: &'a str,
     view_config: &'a ViewConfig,
@@ -94,7 +94,7 @@ fn cache_info<'a>(cache: &'a PostStore) -> Element<'a, Message> {
 }
 
 fn followed_tag_settings<'a>(
-    followed_tags: &'a Vec<FollowedTag>,
+    followed_tags: &'a FxHashMap<String, Option<u32>>,
     new_followed_tag: &'a str,
 ) -> Element<'a, Message> {
     let followed_tag_input = text_input("new tag", new_followed_tag)
@@ -102,7 +102,7 @@ fn followed_tag_settings<'a>(
         .on_submit(Message::Followed(FollowedMessage::AddTag))
         .width(Length::Fill);
 
-    let tag_buttons = row(followed_tags.iter().map(|tag| {
+    let tag_buttons = row(followed_tags.keys().map(|tag| {
         row![
             text(tag.to_string()),
             button("x").on_press(Message::Followed(FollowedMessage::RemoveTag(
@@ -138,6 +138,12 @@ fn appearance_settings<'a>(current_theme: &'a MsgTheme) -> Element<'a, Message> 
 
 fn view_settings<'a>(config: &'a ViewConfig) -> Element<'a, Message> {
     let settings = column![
+        row![
+            checkbox("Download sample images", config.download_sample)
+                .on_toggle(|value| Message::Settings(SettingsMessage::SampleToggled(value))),
+            checkbox("Download full size images", config.download_fullsize)
+                .on_toggle(|value| Message::Settings(SettingsMessage::FullsizeToggled(value)))
+        ],
         row![
             text("Max posts per row"),
             number_input(&config.posts_per_row, 1..=10, |value| {

@@ -1,8 +1,9 @@
 use chrono::{prelude::*, TimeDelta};
 
 use iced::font::Weight;
+use iced::widget::image::Handle;
 use iced::widget::text::Shaping;
-use iced::widget::{button, column, container, image, row, scrollable, text};
+use iced::widget::{button, column, container, image, row, scrollable, text, Container};
 use iced::widget::{Column, Row, Text};
 use iced::{Alignment, Element, Length, Theme};
 use iced_gif::Gif;
@@ -47,36 +48,46 @@ fn render_media<'a>(
     post: &Post,
     store: &'a PostStore,
     video_player: &'a Option<VideoPlayerWidget>,
-) -> Element<'a, Message> {
+) -> Container<'a, Message> {
     match post.get_type() {
         Some(crate::core::model::PostType::Image) => {
-            if let Some(img) = store.get_image(post.id) {
-                container(image(img).width(Length::Shrink).height(Length::Shrink)).into()
-            } else {
-                Text::new("Image loading...").into()
-            }
+            get_image(store.get_image(post.id), store.get_sample(post.id))
         }
         Some(crate::core::model::PostType::Gif) => {
             if let Some(_) = store.get_gif(post.id) {
                 match store.gif_frames.get(&post.id) {
-                    Some(frames) => Gif::new(frames).into(),
-                    None => Text::new("Failed to parse GIF").into(),
+                    Some(frames) => container(Gif::new(frames)),
+                    None => container(Text::new("Failed to parse GIF")),
                 }
             } else {
-                Text::new("Gif loading...").into()
+                container(Text::new("Gif loading..."))
             }
         }
         Some(crate::core::model::PostType::Video) => {
             if let Some(vp) = video_player {
-                vp.view()
-                    .map(|msg| Message::Media(MediaMessage::VideoPlayerMsg(msg)))
-                    .into()
+                container(
+                    vp.view()
+                        .map(|msg| Message::Media(MediaMessage::VideoPlayerMsg(msg))),
+                )
             } else {
-                Text::new("Video loading...").into()
+                container(Text::new("Video loading..."))
             }
         }
-        _ => Text::new("Unsupported type").into(),
+        _ => container(Text::new("Unsupported type")),
     }
+}
+
+fn get_image<'a>(
+    fullsize: Option<&'a Handle>,
+    sample: Option<&'a Handle>,
+) -> Container<'a, Message> {
+    if let Some(img) = fullsize {
+        return container(image(img));
+    }
+    if let Some(img) = sample {
+        return container(image(img));
+    }
+    container(Text::new("Image loading..."))
 }
 
 fn info_panel<'a>(post: &'a Post) -> Column<'a, Message> {
@@ -113,7 +124,8 @@ fn render_tag(tag: &String) -> Element<'_, Message> {
             .width(24),
         button(text(tag))
             .on_press(Message::View(ViewMessage::Show(ViewMode::Grid(
-                tag.clone()
+                tag.clone(),
+                Some(1)
             ))))
             .padding(4),
     ]

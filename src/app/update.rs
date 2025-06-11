@@ -3,11 +3,13 @@ use crate::app::message::{
     SettingsMessage, ViewMessage,
 };
 use crate::app::state::{App, ViewMode};
-use crate::core::api::{favorite_post, fetch_comments, fetch_posts, unfavorite_post, vote_post};
+use crate::core::api::{
+    favorite_post, fetch_comments, fetch_posts, unfavorite_post, vote_post, FetchPoint,
+};
 use crate::core::config::Auth;
-use crate::core::media::fetch_preview;
 use crate::core::media::{fetch_gif, fetch_image, fetch_video};
-use crate::core::model::{FollowedTag, Post};
+use crate::core::media::{fetch_preview, fetch_sample};
+use crate::core::model::{Post, PostType};
 use crate::core::store::poststore_path;
 use crate::core::{blacklist, followed, media};
 use crate::gui::video_player::VideoPlayerWidget;
@@ -34,7 +36,10 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
         SearchMessage::LoadPosts(query) => {
             app.loading = true;
             app.selected_post = None;
-            app.ui.view_mode = ViewMode::Grid(query.clone());
+            app.ui.view_mode = ViewMode::Grid(query.clone(), app.search.page);
+            if query != app.search.query {
+                app.posts.clear();
+            }
             app.search.query = query.clone();
             app.search.input = query.clone();
             let auth = app.config.auth.clone();
@@ -50,12 +55,23 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             );
         }
         SearchMessage::LoadMorePosts => {
-            let before_id = app.posts.iter().map(|p| p.id).min();
+            let fetch_point = match app.search.page {
+                Some(page_number) => {
+                    app.search.page = Some(page_number + 1);
+                    app.ui.view_mode = ViewMode::Grid(app.search.query.clone(), app.search.page);
+                    Some(FetchPoint::Page(page_number + 1))
+                }
+                None => {
+                    app.search.page = Some(2);
+                    app.ui.view_mode = ViewMode::Grid(app.search.query.clone(), Some(2));
+                    Some(FetchPoint::Page(2))
+                }
+            };
             app.loading = true;
             let query = app.search.input.clone();
             let auth = app.config.auth.clone();
             return Task::perform(
-                async move { fetch_posts(auth.as_ref(), query.clone(), before_id).await },
+                async move { fetch_posts(auth.as_ref(), query.clone(), fetch_point).await },
                 move |res| match res {
                     Ok(posts) => Message::Search(SearchMessage::PostsLoaded(posts)),
                     Err(err) => {
@@ -79,11 +95,9 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             for post in &filtered {
                 post_ids.push(post.id);
                 if post.is_favorited {
-                    let post_id = post.id;
-                    trace!("{post_id} is already favorited");
                     app.store.set_favorite(post.id, true);
                 }
-                if post.preview.url.is_some() {
+                if post.preview.url.is_some() && !app.store.thumbnails.contains_key(&post.id) {
                     app.search.thumbnail_queue.push_back(post.id);
                     queued_post_count += 1;
                 }
@@ -105,8 +119,9 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
         SearchMessage::Submitted => {
             app.ui.history.proceed(app.ui.view_mode.clone());
             let query = app.search.input.trim().to_string();
+            app.search.page = Some(1);
             app.search.query = query.clone();
-            app.ui.view_mode = ViewMode::Grid(query.clone());
+            app.ui.view_mode = ViewMode::Grid(query.clone(), app.search.page);
             if !query.is_empty() {
                 info!("Submitting search for {query}");
                 let auth = app.config.auth.clone();
@@ -126,8 +141,11 @@ fn update_search(app: &mut App, msg: SearchMessage) -> Task<Message> {
             if app.config.auth.is_none() {
                 return Task::none();
             }
+            app.posts.clear();
             let query = format!("fav:{}", app.config.auth.as_ref().unwrap().username);
-
+            app.ui
+                .history
+                .proceed(ViewMode::Grid(query.clone(), app.search.page));
             return Task::done(Message::Search(SearchMessage::LoadPosts(query)));
         }
     }
@@ -187,19 +205,34 @@ fn update_post(app: &mut App, msg: PostMessage) -> Task<Message> {
                     Some("swf") => {}
                     _ => {
                         if !app.store.has_image(id) {
-                            let file = post.file.clone();
-                            commands.push(Task::perform(
-                                fetch_image(id, file),
-                                move |res| match res {
-                                    Ok(handle) => {
-                                        Message::Media(MediaMessage::ImageLoaded(id, handle))
-                                    }
-                                    Err(err) => {
-                                        error!("Image {id} failed: {err}");
-                                        Message::Tick
-                                    }
-                                },
-                            ));
+                            if app.config.view.download_sample {
+                                commands.push(Task::perform(
+                                    fetch_sample(id, post.sample.clone()),
+                                    move |res| match res {
+                                        Ok(handle) => {
+                                            Message::Media(MediaMessage::SampleLoaded(id, handle))
+                                        }
+                                        Err(err) => {
+                                            error!("Sample {id} failed: {err}");
+                                            Message::Tick
+                                        }
+                                    },
+                                ));
+                            }
+                            if app.config.view.download_fullsize {
+                                commands.push(Task::perform(
+                                    fetch_image(id, post.file.clone()),
+                                    move |res| match res {
+                                        Ok(handle) => {
+                                            Message::Media(MediaMessage::ImageLoaded(id, handle))
+                                        }
+                                        Err(err) => {
+                                            error!("Image {id} failed: {err}");
+                                            Message::Tick
+                                        }
+                                    },
+                                ));
+                            }
                         }
                     }
                 }
@@ -271,7 +304,11 @@ fn update_media(app: &mut App, msg: MediaMessage) -> Task<Message> {
     match msg {
         MediaMessage::ThumbnailLoaded(id, handle) => {
             debug!("Storing thumbnail for {id}");
-            app.store.insert_thumbnail(id, handle)
+            app.store.insert_thumbnail(id, handle);
+        }
+        MediaMessage::SampleLoaded(id, handle) => {
+            debug!("Storing sample for {id}");
+            app.store.insert_sample(id, handle);
         }
         MediaMessage::ImageLoaded(id, handle) => {
             debug!("Storing image for {id}");
@@ -318,10 +355,13 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
             app.search.query.push_str(&(" ".to_owned() + &tag));
             app.search.input = app.search.query.clone();
             app.loading = true;
-            app.ui.view_mode = ViewMode::Grid(app.search.query.clone());
+            app.ui.view_mode = ViewMode::Grid(app.search.query.clone(), Some(1));
             let query = app.search.query.clone();
 
-            return Task::done(Message::View(ViewMessage::Show(ViewMode::Grid(query))));
+            return Task::done(Message::View(ViewMessage::Show(ViewMode::Grid(
+                query,
+                Some(1),
+            ))));
         }
         DetailMessage::NegateTagFromSearch(tag) => {
             app.selected_post = None;
@@ -329,10 +369,13 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
             app.search.input = app.search.query.clone();
             app.loading = true;
 
-            app.ui.view_mode = ViewMode::Grid(app.search.query.clone());
+            app.ui.view_mode = ViewMode::Grid(app.search.query.clone(), Some(1));
             let query = app.search.query.clone();
 
-            return Task::done(Message::View(ViewMessage::Show(ViewMode::Grid(query))));
+            return Task::done(Message::View(ViewMessage::Show(ViewMode::Grid(
+                query,
+                Some(1),
+            ))));
         }
         DetailMessage::CommentsLoaded(comments) => {
             app.store.insert_comments(comments);
@@ -342,6 +385,72 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
                 let url = format!("https://e621.net/posts/{}", post);
                 info!("Copying {url} to clipboard");
                 return clipboard::write(url);
+            }
+        }
+        DetailMessage::OpenFile => {
+            if let Some(id) = app.selected_post {
+                if let Some(post) = app.store.get_post(id) {
+                    match post.get_type() {
+                        Some(PostType::Image) => {
+                            if app.config.view.download_fullsize {
+                                let path = app.store.get_image_path(id);
+                                if path.exists() {
+                                    let open_status = open::that_detached(path);
+                                    match open_status {
+                                        Ok(_) => {}
+                                        Err(err) => {
+                                            error!("Couldn't open file: {err}");
+                                        }
+                                    }
+                                    return Task::none();
+                                }
+                            }
+                            if app.config.view.download_sample {
+                                let path = app.store.get_sample_path(id);
+                                if path.exists() {
+                                    let open_status = open::that_detached(path);
+                                    match open_status {
+                                        Ok(_) => {}
+                                        Err(err) => {
+                                            error!("Couldn't open file: {err}");
+                                        }
+                                    }
+                                    return Task::none();
+                                }
+                            }
+                        }
+                        Some(PostType::Gif) => {
+                            let path = app.store.get_gif_path(id);
+                            if path.exists() {
+                                let open_status = open::that_detached(path);
+                                match open_status {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        error!("Couldn't open file: {err}");
+                                    }
+                                }
+                                return Task::none();
+                            }
+                        }
+                        Some(PostType::Video) => {
+                            if let Some(url) = app.store.get_video(id) {
+                                if let Ok(path) = url.to_file_path() {
+                                    if path.exists() {
+                                        let open_status = open::that_detached(path);
+                                        match open_status {
+                                            Ok(_) => {}
+                                            Err(err) => {
+                                                error!("Couldn't open file: {err}");
+                                            }
+                                        }
+                                        return Task::none();
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
@@ -361,6 +470,12 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
         }
         SettingsMessage::FollowFieldChanged(field) => {
             app.followed.new_followed_tag = field;
+        }
+        SettingsMessage::SampleToggled(toggle) => {
+            app.config.view.download_sample = toggle;
+        }
+        SettingsMessage::FullsizeToggled(toggle) => {
+            app.config.view.download_fullsize = toggle;
         }
         SettingsMessage::Save => {
             debug!("Saving settings.");
@@ -383,14 +498,14 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
             app.config.followed_tags = app.followed.tags.clone();
 
             if let Err(err) = app.config.save() {
-                warn!("Faled to save config: {err}");
+                warn!("Failed to save config: {err}");
             }
 
             return Task::done(Message::View(ViewMessage::Show(
                 app.ui
                     .history
                     .previous(app.ui.view_mode.clone())
-                    .unwrap_or(ViewMode::Grid(String::from("order:id_desc"))),
+                    .unwrap_or(ViewMode::Grid(String::from("order:id_desc"), Some(1))),
             )));
         }
         SettingsMessage::PurgeCache => {
@@ -409,8 +524,8 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
 fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
     match msg {
         FollowedMessage::CheckUpdates => {
+            app.ui.history.proceed(app.ui.view_mode.clone());
             app.ui.view_mode = ViewMode::Followed;
-            app.posts.clear();
 
             let tags = app.followed.tags.clone();
             let auth = app.config.auth.clone();
@@ -421,21 +536,18 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
                     Ok(updates) => Message::Followed(FollowedMessage::UpdatesReceived(updates)),
                     Err(err) => {
                         error!("{err}");
-                        Message::View(ViewMessage::Show(ViewMode::Grid(String::from(
-                            "order:id_desc",
-                        ))))
+                        Message::Tick
                     }
                 },
             );
         }
         FollowedMessage::UpdatesReceived(updates) => {
-            app.posts.clear();
-            for (_, posts) in app.followed.new_followed_posts.clone() {
+            for (_, posts) in &updates {
                 for post in posts {
                     let id = post.id;
-                    app.posts.push(post.clone());
                     app.store.insert_post(post.clone());
-                    if post.preview.url.is_some() {
+                    trace!("{post:?}");
+                    if post.preview.url.is_some() && !app.store.thumbnails.contains_key(&post.id) {
                         trace!("Queueing thumbnail for {id}");
                         app.search.thumbnail_queue.push_back(post.id);
                     }
@@ -443,17 +555,12 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
             }
 
             app.followed.new_followed_posts = updates;
-
-            return Task::done(Message::Tick);
         }
         FollowedMessage::AddTag => {
             let tag = app.followed.new_followed_tag.trim();
-            if !tag.is_empty() && !app.followed.tags.iter().any(|f| f.tag == tag) {
+            if !tag.is_empty() && !app.followed.tags.keys().any(|f| f == tag) {
                 info!("Adding tag {tag}");
-                app.followed.tags.push(FollowedTag {
-                    tag: tag.to_string(),
-                    last_seen_post_id: None,
-                });
+                app.followed.tags.insert(tag.to_string(), None);
 
                 app.config.followed_tags = app.followed.tags.clone();
                 let _ = app.config.save();
@@ -461,19 +568,25 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
             app.followed.new_followed_tag.clear();
         }
         FollowedMessage::FollowTag(tag) => {
-            app.followed.tags.push(FollowedTag {
-                tag: tag.to_string(),
-                last_seen_post_id: None,
-            });
+            app.followed.tags.insert(tag.to_string(), None);
 
             app.config.followed_tags = app.followed.tags.clone();
             let _ = app.config.save();
         }
         FollowedMessage::RemoveTag(tag) => {
-            app.followed.tags.retain(|f| f.tag != tag);
+            app.followed.tags.remove(&tag);
 
             app.config.followed_tags = app.followed.tags.clone();
             let _ = app.config.save();
+        }
+        FollowedMessage::ClearSeenPosts => {
+            for (tag, posts) in app.followed.new_followed_posts.drain() {
+                if let Some(latest_post) = posts.first() {
+                    if let Some(seen) = app.followed.tags.get_mut(&tag) {
+                        *seen = Some(latest_post.id);
+                    }
+                }
+            }
         }
     }
     Task::none()
@@ -485,8 +598,9 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
             app.ui.history.proceed(app.ui.view_mode.clone());
             match &mode {
                 ViewMode::Detail(id) => return Task::done(Message::Post(PostMessage::View(*id))),
-                ViewMode::Grid(query) => {
+                ViewMode::Grid(query, page) => {
                     app.search.query = query.clone();
+                    app.search.page = *page;
                     app.search.input = query.clone();
                     app.selected_post = None;
                     app.video_player = None;
@@ -504,9 +618,10 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
         ViewMessage::ShowWithoutProceed(mode) => {
             match &mode {
                 ViewMode::Detail(id) => return Task::done(Message::Post(PostMessage::View(*id))),
-                ViewMode::Grid(query) => {
+                ViewMode::Grid(query, page) => {
                     app.search.query = query.clone();
                     app.search.input = query.clone();
+                    app.search.page = *page;
                     app.ui.view_mode = mode.clone();
                     return Task::done(Message::Search(SearchMessage::LoadPosts(query.clone())));
                 }
@@ -521,11 +636,16 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
             app.ui.window_height = height;
         }
         ViewMessage::Back => {
+            if app.ui.history.backwards.is_empty() {
+                return Task::none();
+            }
+            app.video_player = None;
             match &app.ui.view_mode {
                 ViewMode::Settings => return Task::done(Message::Settings(SettingsMessage::Save)),
-                ViewMode::Grid(query) => {
+                ViewMode::Grid(query, page) => {
                     app.search.query = query.clone();
                     app.search.input = query.clone();
+                    app.search.page = *page;
                 }
                 _ => {}
             }
@@ -533,7 +653,7 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
                 app.ui
                     .history
                     .previous(app.ui.view_mode.clone())
-                    .unwrap_or(ViewMode::Grid(String::from("order:id_desc"))),
+                    .unwrap_or(ViewMode::Grid(String::from("order:id_desc"), Some(1))),
             )));
         }
         ViewMessage::Forward => {
@@ -542,9 +662,10 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
                     ViewMode::Detail(id) => {
                         return Task::done(Message::Post(PostMessage::View(*id)))
                     }
-                    ViewMode::Grid(query) => {
+                    ViewMode::Grid(query, page) => {
                         app.search.query = query.clone();
                         app.search.input = query.clone();
+                        app.search.page = *page;
                     }
                     _ => {}
                 }
@@ -562,7 +683,7 @@ fn update_view(app: &mut App, msg: ViewMessage) -> Task<Message> {
 
 fn tick(app: &mut App) -> Task<Message> {
     if let Some(post_id) = app.search.thumbnail_queue.pop_front() {
-        if let Some(post) = app.posts.iter().find(|p| p.id == post_id) {
+        if let Some(post) = app.store.get_post(post_id) {
             if let Some(url) = &post.preview.url {
                 return Task::perform(fetch_preview(post_id, url.clone()), move |res| match res {
                     Ok(thumb) => Message::Media(MediaMessage::ThumbnailLoaded(post_id, thumb)),

@@ -7,6 +7,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt::{self};
 
+const fn _default_0u32() -> u32 {
+    0u32
+}
+
 /// Represents a post on e621.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Post {
@@ -15,11 +19,13 @@ pub struct Post {
     updated_at: DateTime<Utc>,
     pub file: File,
     pub preview: Preview,
+    pub sample: Sample,
     pub score: Score,
     pub tags: Tags,
     pub rating: Rating,
     pub is_favorited: bool,
-    //pub fav_count: u32,
+    #[serde(default = "_default_0u32")]
+    pub fav_count: u32,
     //pub sources: Vec<String>,
     //pub pools: Vec<u32>,
     //relationships: Relationships,
@@ -44,6 +50,12 @@ pub struct File {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Preview {
+    pub url: Option<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct Sample {
+    pub has: bool,
     pub url: Option<String>,
 }
 
@@ -77,19 +89,6 @@ impl Tags {
             ("lore", &self.lore),
         ]
         .into_iter()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FollowedTag {
-    pub tag: String,
-    #[serde(default)]
-    pub last_seen_post_id: Option<u32>,
-}
-
-impl fmt::Display for FollowedTag {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.tag)
     }
 }
 

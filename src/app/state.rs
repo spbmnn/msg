@@ -2,12 +2,13 @@ use std::collections::VecDeque;
 
 use iced::widget::text_editor::Content;
 use iced::Task;
+use rustc_hash::FxHashMap;
 use tracing::{debug, error, info};
 
 use crate::app::message::SearchMessage;
 use crate::core::api::fetch_posts;
 use crate::core::config::Config;
-use crate::core::model::{FollowedTag, Post};
+use crate::core::model::Post;
 use crate::core::store::{poststore_path, PostStore};
 use crate::gui::video_player::VideoPlayerWidget;
 
@@ -64,7 +65,7 @@ impl ViewHistory {
         }
     }
 
-    /// Store `view` in undo history and clear redo history.
+    /// Store `old_view` in undo history and clear redo history.
     pub fn proceed(&mut self, old_view: ViewMode) {
         self.backwards.push(old_view);
         self.forwards.clear();
@@ -79,19 +80,22 @@ pub struct SearchState {
     pub query: String,
     /// Queue for thumbnail fetching.
     pub thumbnail_queue: VecDeque<u32>,
+    /// Current page for pagination.
+    /// Note that e6 pages start at 1.
+    pub page: Option<usize>,
 }
 
 #[derive(Debug)]
 pub struct FollowedState {
     pub new_followed_tag: String,
-    pub new_followed_posts: Vec<(String, Vec<Post>)>,
-    pub tags: Vec<FollowedTag>,
+    pub new_followed_posts: FxHashMap<String, Vec<Post>>,
+    pub tags: FxHashMap<String, Option<u32>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ViewMode {
-    /// Grid view with search query.
-    Grid(String),
+    /// Grid view with search query and page number.
+    Grid(String, Option<usize>),
     /// Detail view with post ID.
     Detail(u32),
     Settings,
@@ -100,6 +104,8 @@ pub enum ViewMode {
 
 #[derive(Debug)]
 pub struct App {
+    /// Enable debug view.
+    pub debug: bool,
     pub settings: Settings,
     pub ui: UiState,
     pub search: SearchState,
@@ -119,13 +125,14 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> (Self, Task<Message>) {
+    pub fn new(debug: bool) -> (Self, Task<Message>) {
         debug!("creating new Msg");
 
         let search = SearchState {
             input: "order:rank".into(),
             query: "order:rank".into(),
             thumbnail_queue: VecDeque::new(),
+            page: None,
         };
 
         let cache = if let Some(path) = poststore_path() {
@@ -146,7 +153,8 @@ impl App {
 
         let app = Self {
             config: Config::new(),
-            search: search,
+            debug,
+            search,
             store: cache,
             ..Default::default()
         };
@@ -163,6 +171,14 @@ impl App {
         );
 
         (app, cmd)
+    }
+
+    pub fn followed_posts(&self) -> usize {
+        let mut total = 0;
+        for results in self.followed.new_followed_posts.values() {
+            total += results.len()
+        }
+        total
     }
 }
 
@@ -191,7 +207,7 @@ impl Default for App {
                 blacklist_content: Content::with_text(&blacklist).into(),
             },
             ui: UiState {
-                view_mode: ViewMode::Grid(String::from("order:rank")),
+                view_mode: ViewMode::Grid(String::from("order:rank"), Some(1)),
                 window_width: 480,
                 window_height: 640,
                 history: ViewHistory::default(),
@@ -200,13 +216,15 @@ impl Default for App {
                 input: String::new(),
                 query: String::new(),
                 thumbnail_queue: VecDeque::new(),
+                page: None,
             },
             followed: FollowedState {
                 new_followed_tag: String::new(),
-                new_followed_posts: Vec::new(),
+                new_followed_posts: FxHashMap::default(),
                 tags: followed_tags,
             },
-            config: config,
+            config,
+            debug: false,
             store: store,
             posts: Vec::new(),
             selected_post: None,

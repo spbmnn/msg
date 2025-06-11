@@ -11,13 +11,14 @@ use iced_gif::Frames;
 use rmp_serde::Serializer;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
-use serde_flow::Flow;
 use thiserror::Error;
 use tracing::{info, trace, warn};
 use url::Url;
 
+use crate::core::model::PostType;
+
 use super::{
-    media::{gif_dir, image_dir, thumbnail_dir},
+    media::{gif_dir, image_dir, sample_dir, thumbnail_dir},
     model::{Comment, Post, Vote},
 };
 
@@ -42,6 +43,8 @@ pub struct PostStore {
     pub posts: FxHashMap<u32, Post>,
     /// Post thumbnails, stored as [Handle]s of image data.
     pub thumbnails: FxHashMap<u32, Handle>,
+    /// Post sample images, stored as [Handle]s of data. Essentially a lower-res original.
+    pub samples: FxHashMap<u32, Handle>,
     /// Post images, stored as [Handle]s of image data.
     pub images: FxHashMap<u32, Handle>,
     /// Post GIFs, stored as raw bytes.
@@ -65,13 +68,15 @@ pub struct PostStore {
 }
 
 /// Used for serializing [`PostStore`]s.
-#[derive(Debug, Default, Serialize, Deserialize, Flow)]
-#[flow(variant = 1)]
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PostStoreData {
     /// List of [`Post`]s.
     pub posts: FxHashMap<u32, Post>,
     /// List of paths to thumbnail images stored on disk.
     pub thumbnails: FxHashMap<u32, PathBuf>,
+    /// List of paths to sample images stored on disk.
+    pub samples: FxHashMap<u32, PathBuf>,
     /// List of paths to post images stored on disk.
     pub images: FxHashMap<u32, PathBuf>,
     /// List of paths to GIFs stored on disk.
@@ -174,6 +179,19 @@ impl PostStore {
         thumbnail_dir().join(format!("{id}.jpg"))
     }
 
+    // --- Samples ---
+    pub fn insert_sample(&mut self, id: u32, handle: Handle) {
+        self.samples.insert(id, handle);
+    }
+
+    pub fn get_sample(&self, id: u32) -> Option<&Handle> {
+        self.samples.get(&id)
+    }
+
+    pub fn get_sample_path(&self, id: u32) -> PathBuf {
+        sample_dir().join(format!("{id}.jpg"))
+    }
+
     // --- Images ---
 
     pub fn insert_image(&mut self, id: u32, handle: Handle) {
@@ -244,6 +262,14 @@ impl PostStore {
 
     // --- Utilities ---
 
+    pub fn has_thumbnail(&self, id: u32) -> bool {
+        self.thumbnails.contains_key(&id)
+    }
+
+    pub fn has_sample(&self, id: u32) -> bool {
+        self.samples.contains_key(&id)
+    }
+
     pub fn has_image(&self, id: u32) -> bool {
         self.images.contains_key(&id)
     }
@@ -263,6 +289,11 @@ impl PostStore {
                 .thumbnails
                 .keys()
                 .map(|&id| (id, self.get_thumbnail_path(id)))
+                .collect(),
+            samples: self
+                .samples
+                .keys()
+                .map(|&id| (id, self.get_sample_path(id)))
                 .collect(),
             images: self
                 .images
@@ -343,59 +374,55 @@ impl PostStore {
     /// Removes all non-favorited posts from storage.
     pub fn purge(&mut self) -> Result<usize, StoreError> {
         warn!("PURGE INITIATED!");
+        let mut removed_posts = 0;
 
-        let mut new_images = self.images.clone();
-        let mut new_gifs = self.gifs.clone();
-        let mut new_videos = self.videos.clone();
-
-        // capture original lengths of all arrays
-        let mut post_count = self.posts.len();
-        let mut image_count = self.images.len();
-        let mut gif_count = self.gifs.len();
-        let mut video_count = self.videos.len();
-
-        // to prevent borrow-checker shenanigans
-        let favorites = self.favorites.clone();
-
-        self.posts.retain(|id, _post| favorites.contains(id));
-        post_count -= self.posts.len();
-        info!("Removed {post_count} posts");
-
-        for id in self.images.keys() {
-            if !favorites.contains(&id) {
-                let path = self.get_image_path(*id);
-                fs::remove_file(&path)?;
-                trace!("Removed {path:?}");
-                new_images.remove(id);
+        for (id, post) in self.posts.iter() {
+            if self.favorites.contains(&id) {
+                continue;
             }
-        }
-        image_count -= new_images.len();
-        info!("Removed {image_count} images");
+            // Remove thumbnail
+            let thumbnail_path = self.get_thumbnail_path(*id);
+            fs::remove_file(&thumbnail_path)?;
+            trace!("Removed {thumbnail_path:?}");
 
-        for id in self.gifs.keys() {
-            if !favorites.contains(&id) {
-                let path = self.get_gif_path(*id);
-                fs::remove_file(&path)?;
-                trace!("Removed {path:?}");
-                new_gifs.remove(id);
-                self.gif_frames.remove(id);
+            match post.get_type() {
+                Some(PostType::Image) => {
+                    let fullsize_path = self.get_image_path(*id);
+                    if fullsize_path.exists() {
+                        fs::remove_file(&fullsize_path)?;
+                        trace!("Removed {fullsize_path:?}");
+                    }
+                    let sample_path = self.get_sample_path(*id);
+                    if sample_path.exists() {
+                        fs::remove_file(&sample_path)?;
+                        trace!("Removed {sample_path:?}");
+                    }
+                }
+                Some(PostType::Gif) => {
+                    let gif_path = self.get_gif_path(*id);
+                    if gif_path.exists() {
+                        fs::remove_file(&gif_path)?;
+                        trace!("Removed {gif_path:?}");
+                    }
+                }
+                Some(PostType::Video) => {
+                    if let Some(video_url) = self.get_video(*id) {
+                        if let Ok(video_path) = video_url.to_file_path() {
+                            if video_path.exists() {
+                                fs::remove_file(&video_path)?;
+                                trace!("Removed {video_path:?}");
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
+            removed_posts += 1;
         }
-        gif_count -= new_gifs.len();
-        info!("Removed {gif_count} gifs");
 
-        for (id, url) in &self.videos {
-            if !favorites.contains(&id) {
-                let path = url.path();
-                fs::remove_file(&path)?;
-                trace!("Removed {path:?}");
-                new_videos.remove(id);
-            }
-        }
-        video_count -= new_videos.len();
-        info!("Removed {video_count} videos");
+        self.posts.retain(|id, _post| self.favorites.contains(id));
 
-        Ok(post_count)
+        Ok(removed_posts)
     }
 }
 

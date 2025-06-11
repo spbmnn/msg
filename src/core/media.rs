@@ -6,12 +6,15 @@ use gstreamer::glib::object::{Cast, ObjectExt};
 use gstreamer::prelude::*;
 use gstreamer::{self as gst};
 use gstreamer_app::AppSink;
+use iced::advanced::image::Bytes;
 use iced::widget::image::Handle;
 use iced_video_player::Video;
 use image::DynamicImage;
 use thiserror::Error;
 use tracing::{debug, instrument, trace, warn};
 use url::Url;
+
+use crate::core::model::Sample;
 
 use super::http::CLIENT;
 use super::model::File;
@@ -116,6 +119,26 @@ pub async fn fetch_image(id: u32, file: File) -> Result<Handle, MediaError> {
     std::fs::write(&resized_path, &buf)?;
 
     Ok(Handle::from_bytes(buf))
+}
+
+#[instrument(skip(file))]
+pub async fn fetch_sample(id: u32, file: Sample) -> Result<Handle, MediaError> {
+    let path: PathBuf = cache_dir().join("sample").join(format!("{id}.jpg"));
+
+    if path.exists() {
+        trace!("Loading {id} from cache ({path:?})");
+        let bytes = std::fs::read(path)?;
+        return Ok(Handle::from_bytes(bytes));
+    }
+
+    let url = file.url.as_ref().ok_or(MediaError::MissingUrl)?;
+    trace!("Getting post {id} from server ({url})");
+    let bytes: Bytes = CLIENT.get(url).send().await?.bytes().await?;
+    trace!("Saving to {path:?}");
+    std::fs::create_dir_all(path.parent().unwrap())?;
+    std::fs::write(&path, &bytes)?;
+
+    Ok(Handle::from_bytes(bytes))
 }
 
 #[instrument(skip(url))]
@@ -244,6 +267,10 @@ pub fn cache_dir() -> PathBuf {
 
 pub fn thumbnail_dir() -> PathBuf {
     cache_dir().join("thumbnails")
+}
+
+pub fn sample_dir() -> PathBuf {
+    cache_dir().join("samples")
 }
 
 pub fn image_dir() -> PathBuf {

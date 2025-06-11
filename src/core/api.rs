@@ -34,16 +34,35 @@ struct PostsResponse {
     posts: Vec<Post>,
 }
 
+/// Index point for [`fetch_posts`]. Take the following snippet from the [e6 API wiki page](https://e621.net/wiki_pages/2425#posts_list):
+/// > `page` The page that will be returned. Can also be used with `a` or `b` + post_id to get the posts after or before the specified post ID. For example `a13` gets every post after post_id 13 up to the limit. This overrides any ordering meta-tag, `order:id_desc` is always used instead.
+#[derive(Debug, Clone, Copy)]
+pub enum FetchPoint {
+    Page(usize),
+    Before(u32),
+    After(u32),
+}
+
+impl FetchPoint {
+    pub fn page_query(&self) -> String {
+        match self {
+            FetchPoint::Page(page_num) => format!("&page={page_num}"),
+            FetchPoint::Before(post_id) => format!("&page=b{post_id}"),
+            FetchPoint::After(post_id) => format!("&page=a{post_id}"),
+        }
+    }
+}
+
 #[instrument]
 pub async fn fetch_posts(
     auth: Option<&Auth>,
     tag: String,
-    before_id: Option<u32>,
+    fetch_point: Option<FetchPoint>,
 ) -> Result<Vec<Post>, ApiError> {
     let mut url = format!("{BASE_URL}/posts.json?tags={}", tag);
 
-    if let Some(id) = before_id {
-        url.push_str(&format!("&page=b{}", id));
+    if let Some(point) = fetch_point {
+        url.push_str(&point.page_query());
     }
 
     trace!("GET {url}");

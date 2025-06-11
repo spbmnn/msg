@@ -10,7 +10,10 @@ use crate::{
         state::ViewMode,
         Message,
     },
-    core::model::{Post, Rating},
+    core::{
+        model::{Post, Rating},
+        store::PostStore,
+    },
 };
 
 pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>, width: f32) -> Element<'a, Message> {
@@ -40,6 +43,7 @@ pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>, width: f32) -> Elemen
     let ext = text(format!("{}", post.file.ext.clone().unwrap_or("".into()))).size(12);
 
     let meta = row![
+        //text(format!("#{}", post.id)).size(12),
         text(format!("score: {}", post.score.total)).size(12),
         rating_text,
         ext,
@@ -60,7 +64,7 @@ pub fn render<'a>(post: &Post, thumbnail: Option<&Handle>, width: f32) -> Elemen
 
 pub fn grid_view<'a>(
     posts: &[Post],
-    images: &[Option<&Handle>],
+    store: &PostStore,
     window_width: usize,
     posts_per_row: usize,
     tile_width: usize,
@@ -70,11 +74,12 @@ pub fn grid_view<'a>(
 
     let chunks = min(window_width / tile_width, posts_per_row);
 
-    for chunk in posts.iter().zip(images).collect::<Vec<_>>().chunks(chunks) {
+    for chunk in posts.iter().collect::<Vec<_>>().chunks(chunks) {
         let mut r = row![];
 
-        for (post, img) in chunk {
-            r = r.push(render(post, **img, tile_width as f32));
+        for post in chunk {
+            let img = store.get_thumbnail(post.id);
+            r = r.push(render(post, img, tile_width as f32));
         }
 
         grid = grid.push(container(r).center_x(Length::Fill).width(Length::Fill));

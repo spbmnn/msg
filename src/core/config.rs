@@ -1,6 +1,7 @@
 use core::fmt;
 use directories::ProjectDirs;
 use iced::Theme;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use thiserror::Error;

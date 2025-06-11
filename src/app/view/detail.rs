@@ -26,7 +26,9 @@ pub fn detail_bar(app: &App) -> Row<'_, Message> {
         Rating::Explicit => "Rating: Explicit",
     }));
     bar = bar.push(text(format!("Score: {}", post.score.total)));
+    bar = bar.push(text(format!("Favorites: {}", post.fav_count)));
     bar = bar.push(button("copy URL").on_press(Message::Detail(DetailMessage::CopyURL)));
+    bar = bar.push(button("open file").on_press(Message::Detail(DetailMessage::OpenFile)));
 
     bar
 }

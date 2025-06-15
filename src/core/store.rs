@@ -15,7 +15,7 @@ use thiserror::Error;
 use tracing::{info, trace, warn};
 use url::Url;
 
-use crate::model::PostType;
+use crate::core::model::PostType;
 
 use super::{
     media::{gif_dir, image_dir, sample_dir, thumbnail_dir},

@@ -1,6 +1,7 @@
 use core::fmt;
 use directories::ProjectDirs;
 use iced::Theme;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -9,7 +10,7 @@ use std::{
 use thiserror::Error;
 use tracing::{info, trace};
 
-use crate::followed::FollowedTag;
+use crate::core::followed::FollowedTag;
 
 use super::blacklist::Blacklist;
 

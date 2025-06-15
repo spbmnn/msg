@@ -14,7 +14,7 @@ use thiserror::Error;
 use tracing::{debug, instrument, trace, warn};
 use url::Url;
 
-use crate::model::Sample;
+use crate::core::model::Sample;
 
 use super::http::CLIENT;
 use super::model::File;

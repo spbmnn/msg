@@ -14,10 +14,9 @@ use thiserror::Error;
 use tracing::{debug, instrument, trace, warn};
 use url::Url;
 
-use crate::core::model::Sample;
-
 use super::http::CLIENT;
 use super::model::File;
+use super::model::Sample;
 
 const SIZE: u32 = 4096; // Textures larger than 4096x4096 tend to crash wgpu
 

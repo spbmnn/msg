@@ -1,13 +1,16 @@
 use core::fmt;
 use directories::ProjectDirs;
 use iced::Theme;
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
-use tracing::info;
+use tracing::{info, trace};
 
 use super::blacklist::Blacklist;
+use super::followed::FollowedTag;
 
 const fn _default_true() -> bool {
     true
@@ -63,22 +66,22 @@ impl ToString for MsgTheme {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
 #[serde(default)]
 pub struct Config {
     pub auth: Option<Auth>,
     pub blacklist: Blacklist,
-    pub followed_tags: FxHashMap<String, Option<u32>>,
+    pub followed_tags: Vec<FollowedTag>,
     pub view: ViewConfig,
 }
 
-#[derive(Deserialize, Default, Serialize, Clone)]
+#[derive(Deserialize, Default, Serialize, Clone, PartialEq)]
 pub struct Auth {
     pub username: String,
     pub api_key: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct ViewConfig {
     #[serde(default)]
     pub theme: MsgTheme,
@@ -127,8 +130,7 @@ impl Config {
     pub fn load() -> Result<Config, ConfigError> {
         let path = config_path()?.join("config.toml");
 
-        let raw = fs::read_to_string(&path)?;
-        let config = toml::from_str::<Config>(&raw)?;
+        let config = Config::load_from(&path)?;
 
         info!("Loaded config from {path:?}");
         return Ok(config);
@@ -137,8 +139,62 @@ impl Config {
     pub fn save(&self) -> Result<(), ConfigError> {
         let path = config_path()?.join("config.toml");
         fs::create_dir_all(path.parent().unwrap())?;
+        self.save_to(&path)?;
+        trace!("{self:?}");
+        Ok(())
+    }
+
+    pub fn load_from(path: &Path) -> Result<Config, ConfigError> {
+        let raw = fs::read_to_string(path)?;
+        let config = toml::from_str::<Config>(&raw)?;
+
+        Ok(config)
+    }
+
+    pub fn save_to(&self, path: &Path) -> Result<(), ConfigError> {
         let toml = toml::to_string_pretty(self)?;
         fs::write(path, toml)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempdir::TempDir;
+
+    use super::*;
+
+    #[test]
+    fn toml_sanity_check() {
+        let config = Config {
+            auth: Some(Auth {
+                username: "dingus".to_owned(),
+                api_key: "bingus".to_owned(),
+            }),
+            blacklist: Blacklist {
+                rules: vec!["bad".to_owned(), "things".to_owned()],
+            },
+            followed_tags: vec![
+                FollowedTag {
+                    tag: "brand_new".to_owned(),
+                    last_seen: None,
+                },
+                FollowedTag {
+                    tag: "old_one".to_owned(),
+                    last_seen: Some(1),
+                },
+            ],
+            view: ViewConfig {
+                ..Default::default()
+            },
+        };
+
+        let temp_dir = TempDir::new("msg").expect("Couldn't make TempDir");
+        let file_path = temp_dir.path().join("config.toml");
+
+        config.save_to(&file_path).expect("Couldn't save config");
+        let new_config = Config::load_from(&file_path).expect("Couldn't load config");
+
+        assert_eq!(config, new_config);
     }
 }

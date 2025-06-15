@@ -2,11 +2,11 @@ use reqwest::Method;
 use std::cmp::{max, min};
 use tracing::{debug, instrument, trace, Level};
 
+use super::super::config::Auth;
+use super::super::http::{authed_request, CLIENT};
+use super::super::model::Comment;
 use super::rate_limiter::API_LIMITER;
 use super::{ApiError, BASE_URL};
-use crate::core::config::Auth;
-use crate::core::http::{authed_request, CLIENT};
-use crate::core::model::Comment;
 
 #[instrument(level = Level::TRACE)]
 pub async fn fetch_comments(

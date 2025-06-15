@@ -3,10 +3,8 @@ use serde::Deserialize;
 use thiserror::Error;
 use tracing::{debug, error, instrument, trace};
 
-use crate::core::http::authed_request;
-
 use super::config::Auth;
-use super::http::CLIENT;
+use super::http::{authed_request, CLIENT};
 use super::model::{Post, Vote};
 
 pub mod comments;

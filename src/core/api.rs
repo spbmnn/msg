@@ -3,7 +3,7 @@ use serde::Deserialize;
 use thiserror::Error;
 use tracing::{debug, error, instrument, trace};
 
-use crate::core::http::authed_request;
+use crate::http::authed_request;
 
 use super::config::Auth;
 use super::http::CLIENT;

@@ -55,3 +55,11 @@ tempdir = "0.3"
 
 [patch.crates-io]
 iced_video_player = { git = "https://github.com/jazzfool/iced_video_player", branch = "master" }
+
+[lib]
+path = "src/core/lib.rs"
+test = true
+bench = true
+doc = true
+harness = true
+crate-type = ["lib"]

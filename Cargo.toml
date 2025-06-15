@@ -57,9 +57,9 @@ tempdir = "0.3"
 iced_video_player = { git = "https://github.com/jazzfool/iced_video_player", branch = "master" }
 
 [lib]
-path = "src/core/lib.rs"
-test = true
-bench = true
-doc = true
-harness = true
-crate-type = ["lib"]
+name = "msg"
+path = "src/core/mod.rs"
+
+[[bin]]
+name = "msg"
+path = "src/main.rs"

@@ -9,9 +9,8 @@ use std::{
 use thiserror::Error;
 use tracing::{info, trace};
 
-use crate::followed::FollowedTag;
-
 use super::blacklist::Blacklist;
+use super::followed::FollowedTag;
 
 const fn _default_true() -> bool {
     true

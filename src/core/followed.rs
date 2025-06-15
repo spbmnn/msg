@@ -1,6 +1,6 @@
-use crate::api::{self, FetchPoint};
-use crate::config::Auth;
-use crate::model::Post;
+use super::api::{self, FetchPoint};
+use super::config::Auth;
+use super::model::Post;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use tracing::{instrument, warn};

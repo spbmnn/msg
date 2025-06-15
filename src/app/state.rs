@@ -193,6 +193,12 @@ impl Default for App {
             Some(ref auth) => (auth.username.clone(), auth.api_key.clone()),
         };
         let followed_tags = config.followed_tags.clone();
+        let mut tag_map = FxHashMap::default();
+
+        for tag in followed_tags {
+            tag_map.insert(tag.tag, tag.last_seen);
+        }
+
         let blacklist = config.blacklist.rules.join("\n").clone();
 
         let store = PostStore::new();
@@ -221,7 +227,7 @@ impl Default for App {
             followed: FollowedState {
                 new_followed_tag: String::new(),
                 new_followed_posts: FxHashMap::default(),
-                tags: followed_tags,
+                tags: tag_map,
             },
             config,
             debug: false,

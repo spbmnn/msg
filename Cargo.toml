@@ -1,6 +1,6 @@
 [package]
 name = "msg"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 build = "build.rs"
 
@@ -49,6 +49,9 @@ tracing-subscriber = { version = "0.3.19", features = [
     "ansi",
 ] }
 url = "2.5.4"
+
+[dev-dependencies]
+tempdir = "0.3"
 
 [patch.crates-io]
 iced_video_player = { git = "https://github.com/jazzfool/iced_video_player", branch = "master" }

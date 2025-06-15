@@ -2,7 +2,7 @@ use super::model::Post;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-#[derive(Debug, Deserialize, Default, Serialize, Clone)]
+#[derive(Debug, Deserialize, Default, Serialize, Clone, PartialEq)]
 pub struct Blacklist {
     pub rules: Vec<String>,
 }

@@ -7,6 +7,7 @@ use crate::core::api::{
     favorite_post, fetch_comments, fetch_posts, unfavorite_post, vote_post, FetchPoint,
 };
 use crate::core::config::Auth;
+use crate::core::followed::{compose_vec, FollowedTag};
 use crate::core::media::{fetch_gif, fetch_image, fetch_video};
 use crate::core::media::{fetch_preview, fetch_sample};
 use crate::core::model::{Post, PostType};
@@ -495,7 +496,7 @@ fn update_settings(app: &mut App, msg: SettingsMessage) -> Task<Message> {
                 .collect::<Vec<String>>();
             app.config.blacklist.rules = blacklist;
 
-            app.config.followed_tags = app.followed.tags.clone();
+            app.config.followed_tags = compose_vec(app.followed.tags.clone());
 
             if let Err(err) = app.config.save() {
                 warn!("Failed to save config: {err}");
@@ -527,11 +528,11 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
             app.ui.history.proceed(app.ui.view_mode.clone());
             app.ui.view_mode = ViewMode::Followed;
 
-            let tags = app.followed.tags.clone();
+            let tags = compose_vec(app.followed.tags.clone());
             let auth = app.config.auth.clone();
 
             return Task::perform(
-                async move { followed::check_for_updates(tags, auth.as_ref()).await },
+                async move { followed::check_for_updates(&tags, auth.as_ref()).await },
                 move |res| match res {
                     Ok(updates) => Message::Followed(FollowedMessage::UpdatesReceived(updates)),
                     Err(err) => {
@@ -562,7 +563,7 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
                 info!("Adding tag {tag}");
                 app.followed.tags.insert(tag.to_string(), None);
 
-                app.config.followed_tags = app.followed.tags.clone();
+                app.config.followed_tags = compose_vec(app.followed.tags.clone());
                 let _ = app.config.save();
             }
             app.followed.new_followed_tag.clear();
@@ -570,13 +571,13 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
         FollowedMessage::FollowTag(tag) => {
             app.followed.tags.insert(tag.to_string(), None);
 
-            app.config.followed_tags = app.followed.tags.clone();
+            app.config.followed_tags = compose_vec(app.followed.tags.clone());
             let _ = app.config.save();
         }
         FollowedMessage::RemoveTag(tag) => {
             app.followed.tags.remove(&tag);
 
-            app.config.followed_tags = app.followed.tags.clone();
+            app.config.followed_tags = compose_vec(app.followed.tags.clone());
             let _ = app.config.save();
         }
         FollowedMessage::ClearSeenPosts => {
@@ -701,6 +702,8 @@ fn tick(app: &mut App) -> Task<Message> {
 
 fn exit(app: &mut App) -> Task<Message> {
     info!("exiting...");
+
+    app.config.followed_tags = compose_vec(app.followed.tags.clone());
 
     match &app.config.save() {
         Ok(()) => info!("Saved config"),

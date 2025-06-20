@@ -379,7 +379,14 @@ fn update_detail(app: &mut App, msg: DetailMessage) -> Task<Message> {
             ))));
         }
         DetailMessage::CommentsLoaded(comments) => {
-            app.store.insert_comments(comments);
+            for comment in comments {
+                if let Some(comment_vec) = app.store.get_comments(comment.post_id) {
+                    if comment_vec.contains(&comment) {
+                        continue;
+                    }
+                }
+                app.store.insert_comment(comment);
+            }
         }
         DetailMessage::CopyURL => {
             if let Some(post) = app.selected_post {

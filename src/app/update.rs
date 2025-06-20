@@ -545,6 +545,9 @@ fn update_followed(app: &mut App, msg: FollowedMessage) -> Task<Message> {
         FollowedMessage::UpdatesReceived(updates) => {
             for (_, posts) in &updates {
                 for post in posts {
+                    if blacklist::is_blacklisted(post, &app.config.blacklist) {
+                        continue;
+                    }
                     let id = post.id;
                     app.store.insert_post(post.clone());
                     trace!("{post:?}");

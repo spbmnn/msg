@@ -50,9 +50,6 @@ tracing-subscriber = { version = "0.3.19", features = [
 ] }
 url = "2.5.4"
 
-[dev-dependencies]
-tempdir = "0.3"
-
 [patch.crates-io]
 iced_video_player = { git = "https://github.com/jazzfool/iced_video_player", branch = "master" }
 
@@ -63,3 +60,6 @@ path = "src/core/mod.rs"
 [[bin]]
 name = "msg"
 path = "src/main.rs"
+
+[dev-dependencies]
+tempfile = "3.19.1"

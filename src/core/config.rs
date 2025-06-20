@@ -160,7 +160,7 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     use super::*;
 
@@ -189,7 +189,7 @@ mod tests {
             },
         };
 
-        let temp_dir = TempDir::new("msg").expect("Couldn't make TempDir");
+        let temp_dir = TempDir::new().expect("Couldn't make TempDir");
         let file_path = temp_dir.path().join("config.toml");
 
         config.save_to(&file_path).expect("Couldn't save config");

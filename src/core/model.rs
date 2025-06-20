@@ -168,3 +168,9 @@ pub struct Comment {
     pub created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
+
+impl PartialEq for Comment {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}

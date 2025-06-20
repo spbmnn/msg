@@ -118,12 +118,16 @@ impl PostStore {
     }
 
     // --- Comments ---
+    pub fn insert_comment(&mut self, comment: Comment) {
+        self.comments
+            .entry(comment.post_id)
+            .or_insert(Vec::new())
+            .push(comment);
+    }
+
     pub fn insert_comments(&mut self, comments: impl IntoIterator<Item = Comment>) {
         for comment in comments {
-            self.comments
-                .entry(comment.post_id)
-                .or_insert(Vec::new())
-                .push(comment);
+            self.insert_comment(comment)
         }
     }
 

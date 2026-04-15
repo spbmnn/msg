@@ -5,7 +5,7 @@ use iced::widget::image::Handle;
 use iced::widget::text::Shaping;
 use iced::widget::{button, column, container, image, row, scrollable, text, Container};
 use iced::widget::{Column, Row, Text};
-use iced::{Alignment, Element, Length, Theme};
+use iced::{color, Alignment, Color, Element, Length, Theme};
 use iced_gif::Gif;
 
 use crate::app::message::{PostMessage, ViewMessage};
@@ -96,9 +96,13 @@ fn info_panel<'a>(post: &'a Post) -> Column<'a, Message> {
     for (category, tags) in post.tags.iter().filter(|(_, tags)| !tags.is_empty()) {
         let header = text(format!("{category}:")).size(16);
 
-        let tag_list = column(tags.iter().map(|tag| render_tag(tag)).collect::<Vec<_>>())
-            .spacing(8)
-            .width(Length::Fill);
+        let tag_list = column(
+            tags.iter()
+                .map(|tag| render_tag(category, tag))
+                .collect::<Vec<_>>(),
+        )
+        .spacing(8)
+        .width(Length::Fill);
 
         panel = panel.push(header).push(tag_list).push(text(""));
     }
@@ -106,7 +110,21 @@ fn info_panel<'a>(post: &'a Post) -> Column<'a, Message> {
     panel.spacing(10)
 }
 
-fn render_tag(tag: &String) -> Element<'_, Message> {
+fn render_tag<'a>(category: &'static str, tag: &'a String) -> Element<'a, Message> {
+    let tag_color: Option<Color> = match category {
+        // As per [e621:tags](https://e621.net/wiki_pages/11250)
+        "artist" => Some(color!(0xf2ac08)), // --color-tag-artist
+        "contributor" => Some(color!(0x71706e)), // --color-tag-contributor-alt
+        "copyright" => Some(color!(0xdd00dd)), // --color-tag-copyright
+        "character" => Some(color!(0x00aa00)), // --color-tag-character
+        "species" => Some(color!(0xed5d1f)), // --color-tag-species
+        "general" => Some(color!(0x2e76b4)), // --color-tag-general-alt
+        "invalid" => Some(color!(0xff3d3d)), // --color-tag-invalid
+        "meta" => Some(color!(0x666666)),   // --color-tag-meta
+        "lore" => Some(color!(0x228822)),   // --color-tag-lore
+        _ => None,
+    };
+
     row![
         button("f")
             .on_press(Message::Followed(FollowedMessage::FollowTag(tag.clone())))
@@ -127,6 +145,12 @@ fn render_tag(tag: &String) -> Element<'_, Message> {
                 tag.clone(),
                 Some(1)
             ))))
+            .style(move |theme: &Theme, _status| {
+                match tag_color {
+                    Some(color) => button::Style::default().with_background(color),
+                    None => button::Style::default(),
+                }
+            })
             .padding(4),
     ]
     .into()

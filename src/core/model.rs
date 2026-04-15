@@ -68,6 +68,7 @@ pub struct Score {
 pub struct Tags {
     pub general: Vec<String>,
     pub artist: Vec<String>,
+    pub contributor: Vec<String>,
     pub copyright: Vec<String>,
     pub character: Vec<String>,
     pub species: Vec<String>,
@@ -80,6 +81,7 @@ impl Tags {
     pub fn iter(&self) -> impl Iterator<Item = (&'static str, &Vec<String>)> {
         [
             ("artist", &self.artist),
+            ("contributor", &self.contributor),
             ("copyright", &self.copyright),
             ("character", &self.character),
             ("species", &self.species),

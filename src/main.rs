@@ -33,13 +33,14 @@ fn main() -> iced::Result {
         std::process::exit(1);
     }
 
-    iced::application(app::title, app::update, app::view)
+    iced::application(App::new, App::update, App::view)
         .window(Settings {
             icon: icon::from_file_data(include_bytes!("msg.png"), None).ok(),
             ..Settings::default()
         })
-        .theme(app::theme)
+        .theme(App::theme)
         .exit_on_close_request(false)
-        .subscription(app::subscription)
-        .run_with(move || App::new(debug))
+        .subscription(App::subscription)
+        .title(App::title)
+        .run()
 }

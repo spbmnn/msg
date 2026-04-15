@@ -7,7 +7,6 @@ build = "build.rs"
 [dependencies]
 anyhow = "1.0.97"
 base64 = "0.22.1"
-bincode = { version = "2.0.1", features = ["serde"] }
 bitcode = { version = "0.6.9", features = ["serde"] }
 byte-unit = { version = "5.1.6", features = ["serde"] }
 chrono = { version = "0.4.40", features = ["serde", "std"] }
@@ -50,9 +49,6 @@ tracing-subscriber = { version = "0.3.19", features = [
     "ansi",
 ] }
 url = "2.5.4"
-
-[patch.crates-io]
-iced_video_player = { git = "https://github.com/jazzfool/iced_video_player", branch = "master" }
 
 [lib]
 name = "msg"

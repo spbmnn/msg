@@ -5,6 +5,7 @@ mod util;
 
 use app::App;
 use clap::{command, Arg};
+use iced::window::{icon, Settings};
 use tracing::{error, info};
 
 fn main() -> iced::Result {
@@ -33,6 +34,10 @@ fn main() -> iced::Result {
     }
 
     iced::application(app::title, app::update, app::view)
+        .window(Settings {
+            icon: icon::from_file_data(include_bytes!("msg.png"), None).ok(),
+            ..Settings::default()
+        })
         .theme(app::theme)
         .exit_on_close_request(false)
         .subscription(app::subscription)

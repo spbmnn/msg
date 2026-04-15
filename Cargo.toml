@@ -8,6 +8,7 @@ build = "build.rs"
 anyhow = "1.0.97"
 base64 = "0.22.1"
 bincode = { version = "2.0.1", features = ["serde"] }
+bitcode = { version = "0.6.9", features = ["serde"] }
 byte-unit = { version = "5.1.6", features = ["serde"] }
 chrono = { version = "0.4.40", features = ["serde", "std"] }
 clap = { version = "4.5.40", features = ["cargo"] }

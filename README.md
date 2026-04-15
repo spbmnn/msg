@@ -9,6 +9,8 @@ TODO:
   - [ ] should probably refactor image/file saving logic since it's kinda duplicated
 - [X] have search result store keep 'load more' posts
 - [ ] *mayyyyybe* split `PostStoreData` into multiple files? would have to benchmark to make sure
+- [ ] clear/update search queue on blacklist modding
+- [ ] fix this amnesiac ass file saving
 
 ## Known Issues
 - [Seeking on VP9 videos is currently broken](https://discourse.gstreamer.org/t/vp9-seeking-broken-in-gstreamer-1-26/4647/4). An "open file" button has been added as a workaround - this opens it in your native media player via [`open`](https://crates.io/crates/open).

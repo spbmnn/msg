@@ -1,14 +1,15 @@
 [package]
 name = "msg"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 build = "build.rs"
 
 [dependencies]
 anyhow = "1.0.97"
 base64 = "0.22.1"
-bincode = { version = "2.0.1", features = ["serde"] }
+bitcode = { version = "0.6.9", features = ["serde"] }
 byte-unit = { version = "5.1.6", features = ["serde"] }
+bytes = { version = "1.11.1", features = ["serde"] }
 chrono = { version = "0.4.40", features = ["serde", "std"] }
 clap = { version = "4.5.40", features = ["cargo"] }
 directories = "6.0.0"
@@ -17,9 +18,9 @@ futures = "0.3.31"
 glib = "0.20.9"
 gstreamer = "0.23.5"
 gstreamer-app = "0.23.5"
-iced = { version = "0.13.1", features = ["image", "tokio", "advanced"] }
-iced_aw = "0.12.2"
-iced_gif = { version = "0.13.0", features = ["tokio"] }
+iced = { version = "0.14.0", features = ["image", "tokio", "advanced"] }
+iced_aw = "0.13.1"
+iced_gif = { version = "0.14.0", features = ["tokio"] }
 iced_video_player = "0.6"
 image = { version = "0.25.6", features = ["serde"] }
 nom = "8.0.0"
@@ -50,12 +51,6 @@ tracing-subscriber = { version = "0.3.20", features = [
 ] }
 url = "2.5.4"
 
-[dev-dependencies]
-tempdir = "0.3"
-
-[patch.crates-io]
-iced_video_player = { git = "https://github.com/jazzfool/iced_video_player", branch = "master" }
-
 [lib]
 name = "msg"
 path = "src/core/mod.rs"
@@ -63,3 +58,6 @@ path = "src/core/mod.rs"
 [[bin]]
 name = "msg"
 path = "src/main.rs"
+
+[dev-dependencies]
+tempfile = "3.19.1"

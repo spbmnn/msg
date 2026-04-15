@@ -23,7 +23,7 @@ pub fn is_blacklisted(post: &Post, blacklist: &Blacklist) -> bool {
             }
         }
         let post_id = post.id;
-        debug!("Filtered post {post_id} for rule {rule}");
+        //debug!("Filtered post {post_id} for rule {rule}");
         return true;
     }
 

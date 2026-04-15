@@ -1,7 +1,7 @@
 use reqwest::Method;
 use serde::Deserialize;
 use thiserror::Error;
-use tracing::{debug, error, instrument, trace};
+use tracing::{debug, instrument, trace};
 
 use super::config::Auth;
 use super::http::{authed_request, CLIENT};

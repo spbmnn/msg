@@ -1,12 +1,12 @@
 use std::io::Cursor;
 use std::path::PathBuf;
 
+use bytes::Bytes;
 use directories::ProjectDirs;
 use gstreamer::glib::object::{Cast, ObjectExt};
 use gstreamer::prelude::*;
 use gstreamer::{self as gst};
 use gstreamer_app::AppSink;
-use iced::advanced::image::Bytes;
 use iced::widget::image::Handle;
 use iced_video_player::Video;
 use image::DynamicImage;

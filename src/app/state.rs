@@ -125,7 +125,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(debug: bool) -> (Self, Task<Message>) {
+    pub fn new() -> (Self, Task<Message>) {
         debug!("creating new Msg");
 
         let search = SearchState {
@@ -153,7 +153,6 @@ impl App {
 
         let app = Self {
             config: Config::new(),
-            debug,
             search,
             store: cache,
             ..Default::default()

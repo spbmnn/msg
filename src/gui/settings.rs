@@ -162,9 +162,11 @@ fn appearance_settings<'a>(current_theme: &'a MsgTheme) -> Element<'a, Message> 
 fn view_settings<'a>(config: &'a ViewConfig) -> Element<'a, Message> {
     let settings = column![
         row![
-            checkbox("Download sample images", config.download_sample)
+            checkbox(config.download_sample)
+                .label("Download sample images")
                 .on_toggle(|value| Message::Settings(SettingsMessage::SampleToggled(value))),
-            checkbox("Download full size images", config.download_fullsize)
+            checkbox(config.download_fullsize)
+                .label("Download fullsize images")
                 .on_toggle(|value| Message::Settings(SettingsMessage::FullsizeToggled(value)))
         ],
         row![
